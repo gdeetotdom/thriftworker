@@ -1,9 +1,9 @@
 from socket_zmq.proxy import Proxy
 from socket_zmq.utils import cached_property, SubclassMixin
+from socket_zmq.worker import Worker
 from zmq.devices import ThreadDevice
 import _socket
 import pyev
-import signal
 import socket
 import zmq
 
@@ -37,24 +37,6 @@ class ProxyComponent(object):
         self.proxy.stop()
 
 
-class SignalComponent(object):
-    """Signal listener component."""
-
-    app = None
-
-    def __init__(self, on_signal):
-        self.watchers = [pyev.Signal(sig, self.app.loop, on_signal)
-                         for sig in (signal.SIGINT, signal.SIGTERM)]
-
-    def start(self):
-        for watcher in self.watchers:
-            watcher.start()
-
-    def stop(self):
-        while self.watchers:
-            self.watchers.pop().stop()
-
-
 class Controller(object):
     """Holder for components."""
 
@@ -65,8 +47,8 @@ class Controller(object):
 
     def __init__(self):
         self._state = None
+        self.loop = self.app.loop
         self.components = set()
-        self.initialize()
 
     def register(self, component):
         self.components.add(component)
@@ -82,9 +64,6 @@ class Controller(object):
             # if we are running stop component here
             component.stop()
 
-    def initialize(self):
-        self.register(self.app.SignalComponent(self.on_signal))
-
     def start(self):
         self._state = self.RUN
 
@@ -93,7 +72,7 @@ class Controller(object):
             component.start()
 
         # start main loop
-        self.app.loop.start()
+        self.loop.start()
 
     def stop(self):
         # we are already stopping
@@ -103,14 +82,11 @@ class Controller(object):
         self._state = self.CLOSE
 
         # stop main loop
-        self.app.loop.stop(pyev.EVBREAK_ALL)
+        self.loop.stop(pyev.EVBREAK_ALL)
 
         # stop all components
         for component in reversed(self.components):
             component.stop()
-
-    def on_signal(self, watcher, revents):
-        self.stop()
 
     def serve_forever(self):
         try:
@@ -122,9 +98,16 @@ class Controller(object):
 class Application(SubclassMixin):
     """Factory for socket_zmq."""
 
-    def __init__(self):
-        self.loop = pyev.Loop()
-        self.context = zmq.Context()
+    def __init__(self, debug=False):
+        self.debug = debug
+
+    @cached_property
+    def loop(self):
+        return pyev.Loop(debug=self.debug)
+
+    @cached_property
+    def context(self):
+        return zmq.Context()
 
     def Socket(self, address):
         """A shortcut to create a TCP socket and bind it.
@@ -163,15 +146,19 @@ class Application(SubclassMixin):
         device.bind_out(backend)
         return device
 
+    def Worker(self, processor, backend):
+        """Create new worker.
+
+        :param processor: message processor
+        :param backend: address of backend socket
+
+        """
+        return Worker(self.context, backend, processor)
+
     @cached_property
     def ProxyComponent(self):
         """Create :class:`ProxyComponent` subclass."""
         return self.subclass_with_self(ProxyComponent)
-
-    @cached_property
-    def SignalComponent(self):
-        """Create :class:`SignalComponent` subclass."""
-        return self.subclass_with_self(SignalComponent)
 
     @cached_property
     def Controller(self):
