@@ -12,6 +12,8 @@ var
 sdist
 develop-eggs
 .installed.cfg
+*.c
+*.so
 
 # Installer logs
 pip-log.txt
@@ -25,3 +27,8 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+#Eclipse
+.project
+.pydevproject
+
