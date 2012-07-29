@@ -1,5 +1,5 @@
 cimport cython
-from libc.stdlib cimport realloc, free
+from cpython.mem cimport PyMem_Realloc as realloc, PyMem_Free as free
 
 from socket_zmq.pool cimport SinkPool
 from socket_zmq.base cimport BaseSocket
@@ -36,8 +36,10 @@ cdef class Buffer:
 
     cdef resize(self, int size):
         if self.length < size:
-            self.length = size
             self.handle = realloc(self.handle, self.length * sizeof(unsigned char))
+            if self.handle == NULL:
+                raise MemoryError()
+            self.length = size
             self.view = frombuffer_2(self.handle, self.length, 0)
 
     cdef slice(self, int offset, int size=0):
