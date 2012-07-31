@@ -1,1 +1,1 @@
-from socket_zmq.app import Application
+from socket_zmq.app import SocketZMQ

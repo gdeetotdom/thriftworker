@@ -5,9 +5,11 @@ from zmq.devices import ThreadDevice
 import _socket
 import pyev
 import socket
+import uuid
 import zmq
+from functools import wraps
 
-__all__ = ['Application']
+__all__ = ['SocketZMQ']
 
 
 class Component(object):
@@ -25,9 +27,10 @@ class ProxyComponent(object):
 
     app = None
 
-    def __init__(self, address, frontend, backend, pool_size=None, backlog=None):
-        self.device = self.app.Device(frontend, backend)
-        self.proxy = self.app.Proxy(address, frontend, pool_size, backlog)
+    def __init__(self, address, backend, pool_size=None, backlog=None):
+        self.frontend = 'inproc://{0}'.format(uuid.uuid4().hex)
+        self.device = self.app.Device(self.frontend, backend)
+        self.proxy = self.app.Proxy(address, self.frontend, pool_size, backlog)
 
     def start(self):
         self.device.start()
@@ -35,6 +38,15 @@ class ProxyComponent(object):
 
     def stop(self):
         self.proxy.stop()
+
+
+def in_loop(func):
+
+    @wraps(func)
+    def inner(self, *args, **kwargs):
+        self._execute(func, self, *args, **kwargs)
+
+    return inner
 
 
 class Controller(object):
@@ -48,8 +60,21 @@ class Controller(object):
     def __init__(self):
         self._state = None
         self.loop = self.app.loop
+        self._async = self.loop.async(lambda watcher, revents: None)
+        self._async.start()
         self.components = set()
 
+    def _execute(self, func, *args, **kwargs):
+
+        def inner(watcher, revents):
+            func(*args, **kwargs)
+            async.stop()
+
+        async = self.loop.async(inner)
+        async.start()
+        async.send()
+
+    @in_loop
     def register(self, component):
         self.components.add(component)
 
@@ -57,6 +82,7 @@ class Controller(object):
             # if we are running start component here
             component.start()
 
+    @in_loop
     def unregister(self, component):
         self.components.remove(component)
 
@@ -74,6 +100,7 @@ class Controller(object):
         # start main loop
         self.loop.start()
 
+    @in_loop
     def stop(self):
         # we are already stopping
         if self._state in (self.CLOSE,):
@@ -85,21 +112,16 @@ class Controller(object):
         self.loop.stop(pyev.EVBREAK_ALL)
 
         # stop all components
-        for component in reversed(self.components):
+        for component in self.components:
             component.stop()
 
-    def serve_forever(self):
-        try:
-            self.start()
-        finally:
-            self.stop()
 
-
-class Application(SubclassMixin):
+class SocketZMQ(SubclassMixin):
     """Factory for socket_zmq."""
 
     def __init__(self, debug=False):
         self.debug = debug
+        super(SocketZMQ, self).__init__()
 
     @cached_property
     def loop(self):
@@ -108,6 +130,11 @@ class Application(SubclassMixin):
     @cached_property
     def context(self):
         return zmq.Context()
+
+    @cached_property
+    def controller(self):
+        """Create instance of :class:`Controller`."""
+        return self.subclass_with_self(Controller)()
 
     def Socket(self, address):
         """A shortcut to create a TCP socket and bind it.
@@ -159,13 +186,3 @@ class Application(SubclassMixin):
     def ProxyComponent(self):
         """Create :class:`ProxyComponent` subclass."""
         return self.subclass_with_self(ProxyComponent)
-
-    @cached_property
-    def Controller(self):
-        """Create :class:`Controller` subclass."""
-        return self.subclass_with_self(Controller)
-
-    @cached_property
-    def controller(self):
-        """Create instance of :class:`Controller`."""
-        return self.Controller()
