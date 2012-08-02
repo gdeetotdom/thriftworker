@@ -18,8 +18,8 @@ cdef class Proxy(object):
         self.socket = socket._sock
         self.context = context
         self.pool = SinkPool(self.loop, self.context, frontend,
-                             pool_size or 128)
-        self.backlog = backlog or 128
+                             pool_size or 1024)
+        self.backlog = backlog or 1024
         self.watcher = Io(self.socket, EV_READ, self.loop,
                           self.on_connection, priority=EV_MINPRI)
 

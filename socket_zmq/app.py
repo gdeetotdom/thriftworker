@@ -1,119 +1,13 @@
+from socket_zmq.listener import Listener
 from socket_zmq.proxy import Proxy
 from socket_zmq.utils import cached_property, SubclassMixin
 from socket_zmq.worker import Worker
 from zmq.devices import ThreadDevice
-import _socket
 import pyev
 import socket
-import uuid
 import zmq
-from functools import wraps
 
 __all__ = ['SocketZMQ']
-
-
-class Component(object):
-    """Base component."""
-
-    def start(self):
-        raise NotImplementedError()
-
-    def stop(self):
-        raise NotImplementedError()
-
-
-class ProxyComponent(object):
-    """Describe proxy component."""
-
-    app = None
-
-    def __init__(self, address, backend, pool_size=None, backlog=None):
-        self.frontend = 'inproc://{0}'.format(uuid.uuid4().hex)
-        self.device = self.app.Device(self.frontend, backend)
-        self.proxy = self.app.Proxy(address, self.frontend, pool_size, backlog)
-
-    def start(self):
-        self.device.start()
-        self.proxy.start()
-
-    def stop(self):
-        self.proxy.stop()
-
-
-def in_loop(func):
-
-    @wraps(func)
-    def inner(self, *args, **kwargs):
-        self._execute(func, self, *args, **kwargs)
-
-    return inner
-
-
-class Controller(object):
-    """Holder for components."""
-
-    RUN = 0x1
-    CLOSE = 0x2
-
-    app = None
-
-    def __init__(self):
-        self._state = None
-        self.loop = self.app.loop
-        self._async = self.loop.async(lambda watcher, revents: None)
-        self._async.start()
-        self.components = set()
-
-    def _execute(self, func, *args, **kwargs):
-
-        def inner(watcher, revents):
-            func(*args, **kwargs)
-            async.stop()
-
-        async = self.loop.async(inner)
-        async.start()
-        async.send()
-
-    @in_loop
-    def register(self, component):
-        self.components.add(component)
-
-        if self._state == self.RUN:
-            # if we are running start component here
-            component.start()
-
-    @in_loop
-    def unregister(self, component):
-        self.components.remove(component)
-
-        if self._state == self.RUN:
-            # if we are running stop component here
-            component.stop()
-
-    def start(self):
-        self._state = self.RUN
-
-        # start all components
-        for component in self.components:
-            component.start()
-
-        # start main loop
-        self.loop.start()
-
-    @in_loop
-    def stop(self):
-        # we are already stopping
-        if self._state in (self.CLOSE,):
-            return
-
-        self._state = self.CLOSE
-
-        # stop main loop
-        self.loop.stop(pyev.EVBREAK_ALL)
-
-        # stop all components
-        for component in self.components:
-            component.stop()
 
 
 class SocketZMQ(SubclassMixin):
@@ -125,16 +19,12 @@ class SocketZMQ(SubclassMixin):
 
     @cached_property
     def loop(self):
+        """Create main event loop."""
         return pyev.Loop(debug=self.debug)
 
     @cached_property
     def context(self):
         return zmq.Context()
-
-    @cached_property
-    def controller(self):
-        """Create instance of :class:`Controller`."""
-        return self.subclass_with_self(Controller)()
 
     def Socket(self, address):
         """A shortcut to create a TCP socket and bind it.
@@ -142,7 +32,7 @@ class SocketZMQ(SubclassMixin):
         :param address: string consist of <host>:<port>
 
         """
-        sock = socket.socket(family=_socket.AF_INET)
+        sock = socket.socket(family=socket.AF_INET)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(address)
         sock.setblocking(0)
@@ -151,7 +41,7 @@ class SocketZMQ(SubclassMixin):
     def Proxy(self, address, frontend, pool_size=None, backlog=None):
         """Create new proxy with given params.
 
-        :param address: string consist of <host>:<port>
+        :param address: tuple consist of (<string>host, <int>port)
         :param frontend: address of frontend zeromq socket
         :param pool_size: size of zeromq pool
         :param backlog: size of socket connection queue
@@ -161,7 +51,7 @@ class SocketZMQ(SubclassMixin):
                      self.context, frontend, pool_size, backlog)
 
     def Device(self, frontend, backend):
-        """Create zmq device.
+        """Create zeromq device.
 
         :param frontend: address of frontend socket
         :param backend: address of backend socket
@@ -183,6 +73,6 @@ class SocketZMQ(SubclassMixin):
         return Worker(self.context, backend, processor)
 
     @cached_property
-    def ProxyComponent(self):
-        """Create :class:`ProxyComponent` subclass."""
-        return self.subclass_with_self(ProxyComponent)
+    def Listener(self):
+        """Create bounded :class:`Listener` class."""
+        return self.subclass_with_self(Listener)

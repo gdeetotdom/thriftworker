@@ -7,8 +7,9 @@ This file was copied and adapted from celery.
 
 """
 from __future__ import absolute_import
+from functools import wraps
 
-__all__ = ['cached_property', 'SubclassMixin']
+__all__ = ['cached_property', 'SubclassMixin', 'in_loop']
 
 
 class cached_property(object):
@@ -102,3 +103,25 @@ class SubclassMixin(object):
                      __doc__=Class.__doc__, **kw)
 
         return type(name or Class.__name__, (Class,), attrs)
+
+
+def in_loop(func):
+    """Schedule execution of given function in main event loop. Result of
+    function ignored.
+
+    :param func: Given callable.
+
+    """
+
+    @wraps(func)
+    def inner_decorator(self, *args, **kwargs):
+
+        def inner_callback(watcher, revents):
+            func(*args, **kwargs)
+            async.stop()
+
+        async = self.loop.async(inner_callback)
+        async.start()
+        async.send()
+
+    return inner_decorator
