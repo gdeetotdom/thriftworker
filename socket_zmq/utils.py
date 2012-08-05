@@ -117,7 +117,7 @@ def in_loop(func):
     def inner_decorator(self, *args, **kwargs):
 
         def inner_callback(watcher, revents):
-            func(*args, **kwargs)
+            func(self, *args, **kwargs)
             async.stop()
 
         async = self.loop.async(inner_callback)
