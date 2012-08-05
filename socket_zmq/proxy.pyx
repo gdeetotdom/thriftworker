@@ -39,7 +39,10 @@ cdef class Proxy(object):
                                               self.on_close))
 
     def on_close(self, SocketSource source):
-        self.connections.remove(source)
+        try:
+            self.connections.remove(source)
+        except KeyError:
+            pass
 
     def start(self):
         self.socket.listen(self.backlog)
