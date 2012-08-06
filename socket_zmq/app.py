@@ -6,6 +6,10 @@ from zmq.devices import ThreadDevice
 import pyev
 import socket
 import zmq
+try:
+    from billiard import cpu_count
+except ImportError:
+    cpu_count = lambda: 0
 
 __all__ = ['SocketZMQ']
 
@@ -24,7 +28,7 @@ class SocketZMQ(SubclassMixin):
 
     @cached_property
     def context(self):
-        return zmq.Context()
+        return zmq.Context(cpu_count())
 
     def Socket(self, address):
         """A shortcut to create a TCP socket and bind it.
