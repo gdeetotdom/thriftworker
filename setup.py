@@ -34,7 +34,7 @@ else:
 
 def source_extension(name):
     extension = '.pyx' if cython_installed else '.c'
-    return os.path.abspath(os.path.join('socket_zmq', name + extension))
+    return os.path.join('socket_zmq', name + extension)
 
 
 # collect extensions
@@ -44,7 +44,7 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
                     **extension_kwargs)
     extensions.append(ext)
 
-package_data = {'socket_zmq': ['*.pxd', '*.pyx']}
+package_data = {'socket_zmq': ['*.pxd']}
 
 
 setup(
