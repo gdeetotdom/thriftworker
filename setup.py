@@ -44,12 +44,15 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
                     **extension_kwargs)
     extensions.append(ext)
 
+package_data = {'socket_zmq': ['*.pxd', '*.pyx']}
+
 
 setup(
     name='socket_zmq',
     cmdclass=cmdclass,
     ext_modules=extensions,
     packages=find_packages(),
+    package_data=package_data,
     install_requires=['pyzmq', 'Cython', 'pyev', 'thrift'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
