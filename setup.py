@@ -1,4 +1,6 @@
-from setuptools import Extension, setup, find_packages
+from distutils.core import setup
+from distutils.extension import Extension
+import re
 import os
 import sys
 
@@ -44,16 +46,60 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
                     **extension_kwargs)
     extensions.append(ext)
 
-package_data = {'socket_zmq': ['*.pxd']}
+package_data = {'socket_zmq': ['*.pxd', '*.pyx']}
+
+# Description, version and other meta information.
+
+re_meta = re.compile(r'__(\w+?)__\s*=\s*(.*)')
+re_vers = re.compile(r'VERSION\s*=\s*\((.*?)\)')
+re_doc = re.compile(r'^"""(.+?)"""')
+rq = lambda s: s.strip("\"'")
+
+
+def add_default(m):
+    attr_name, attr_value = m.groups()
+    return ((attr_name, rq(attr_value)),)
+
+
+def add_version(m):
+    v = list(map(rq, m.groups()[0].split(', ')))
+    return (('VERSION', '.'.join(v[0:3]) + ''.join(v[3:])),)
+
+
+def add_doc(m):
+    return (('doc', m.groups()[0]),)
+
+pats = {re_meta: add_default,
+        re_vers: add_version,
+        re_doc: add_doc}
+here = os.path.abspath(os.path.dirname(__file__))
+meta_fh = open(os.path.join(here, 'socket_zmq/__init__.py'))
+try:
+    meta = {}
+    for line in meta_fh:
+        if line.strip() == '# -eof meta-':
+            break
+        for pattern, handler in pats.items():
+            m = pattern.match(line.strip())
+            if m:
+                meta.update(handler(m))
+finally:
+    meta_fh.close()
 
 
 setup(
     name='socket_zmq',
+    version=meta['VERSION'],
+    description=meta['doc'],
+    author=meta['author'],
+    author_email=meta['contact'],
+    url=meta['homepage'],
+    license='BSD',
     cmdclass=cmdclass,
     ext_modules=extensions,
-    packages=find_packages(),
+    packages=['socket_zmq'],
     package_data=package_data,
-    install_requires=['pyzmq', 'Cython', 'pyev', 'thrift'],
+    requires=['pyzmq', 'Cython', 'pyev', 'thrift'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
                  "Intended Audience :: System Administrators",
