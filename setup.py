@@ -1,7 +1,7 @@
 from distutils.core import setup
 from distutils.extension import Extension
-import re
 import os
+import re
 import sys
 
 
@@ -46,7 +46,7 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
                     **extension_kwargs)
     extensions.append(ext)
 
-package_data = {'socket_zmq': ['*.pxd', '*.pyx']}
+package_data = {'socket_zmq': ['*.pxd']}
 
 # Description, version and other meta information.
 
