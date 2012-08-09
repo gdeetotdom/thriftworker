@@ -46,7 +46,7 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
                     **extension_kwargs)
     extensions.append(ext)
 
-package_data = {'socket_zmq': ['*.pxd']}
+package_data = {'socket_zmq': ['*.pxd', '*.pyx']}
 
 # Description, version and other meta information.
 
