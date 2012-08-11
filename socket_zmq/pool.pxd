@@ -7,6 +7,7 @@ cdef class SinkPool(object):
     cdef int size
     cdef object loop
     cdef object pool
+    cdef object name
     cdef Context context
     cdef object frontend
 

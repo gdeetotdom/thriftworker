@@ -5,10 +5,11 @@ from socket_zmq.base cimport BaseSocket
 
 cdef enum States:
     WAIT_MESSAGE = 1
-    SEND_REQUEST = 2
-    READ_STATUS = 3
-    READ_REPLY = 4
-    CLOSED = 5
+    SEND_NAME = 2
+    SEND_REQUEST = 3
+    READ_STATUS = 4
+    READ_REPLY = 5
+    CLOSED = 6
 
 
 cdef class ZMQSink(BaseSocket):
@@ -19,6 +20,7 @@ cdef class ZMQSink(BaseSocket):
     cdef object all_ok
     cdef object request
     cdef object response
+    cdef object name
     cdef States status
 
     cdef inline bint is_writeable(self)
@@ -26,7 +28,6 @@ cdef class ZMQSink(BaseSocket):
     cdef inline bint is_ready(self)
     cdef inline bint is_closed(self)
 
-    cdef inline read_status(self)
     cdef inline read(self)
     cdef inline write(self)
 

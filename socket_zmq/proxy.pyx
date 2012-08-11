@@ -11,14 +11,15 @@ NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
 cdef class Proxy(object):
 
-    def __init__(self, object loop, object socket, Context context,
+    def __init__(self, object loop, object name, object socket, Context context,
                  object frontend, object pool_size=None, object backlog=None):
         self.connections = set()
         self.loop = loop
+        self.name = name
         self.socket = socket._sock
         self.context = context
-        self.pool = SinkPool(self.loop, self.context, frontend,
-                             pool_size or 1024)
+        self.pool = SinkPool(self.loop, self.context, self.name,
+                             frontend, pool_size or 1024)
         self.backlog = backlog or 1024
         self.watcher = Io(self.socket, EV_READ, self.loop,
                           self.on_connection, priority=EV_MINPRI)

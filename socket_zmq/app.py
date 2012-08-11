@@ -1,8 +1,6 @@
 from socket_zmq.listener import Listener
 from socket_zmq.proxy import Proxy
 from socket_zmq.utils import cached_property, SubclassMixin
-from socket_zmq.worker import Worker
-from zmq.devices import ThreadDevice
 import pyev
 import socket
 import zmq
@@ -42,39 +40,18 @@ class SocketZMQ(SubclassMixin):
         sock.setblocking(0)
         return sock
 
-    def Proxy(self, socket, frontend, pool_size=None, backlog=None):
+    def Proxy(self, name, socket, frontend, pool_size=None, backlog=None):
         """Create new proxy with given params.
 
+        :param name: service name
         :param socket: socket that proxy must listen
         :param frontend: address of frontend zeromq socket
         :param pool_size: size of zeromq pool
         :param backlog: size of socket connection queue
 
         """
-        return Proxy(self.loop, socket, self.context, frontend,
+        return Proxy(self.loop, name, socket, self.context, frontend,
                      pool_size, backlog)
-
-    def Device(self, frontend, backend):
-        """Create zeromq device.
-
-        :param frontend: address of frontend socket
-        :param backend: address of backend socket
-
-        """
-        device = ThreadDevice(zmq.QUEUE, zmq.ROUTER, zmq.DEALER)
-        device.context_factory = lambda: self.context
-        device.bind_in(frontend)
-        device.bind_out(backend)
-        return device
-
-    def Worker(self, processor, backend):
-        """Create new worker.
-
-        :param processor: message processor
-        :param backend: address of backend socket
-
-        """
-        return Worker(self.context, backend, processor)
 
     @cached_property
     def Listener(self):

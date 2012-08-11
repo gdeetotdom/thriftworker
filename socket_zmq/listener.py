@@ -2,7 +2,6 @@
 
 """
 from socket_zmq.utils import in_loop
-import uuid
 
 __all__ = ['Listener']
 
@@ -12,12 +11,13 @@ class Listener(object):
 
     app = None
 
-    def __init__(self, address, backend, pool_size=None, backlog=None):
+    def __init__(self, name, address, frontend, pool_size=None, backlog=None):
+        self.name = name
         self.loop = self.app.loop
         self.socket = self.app.Socket(address)
-        self.frontend = 'inproc://{0}'.format(uuid.uuid4().hex)
-        self.device = self.app.Device(self.frontend, backend)
-        self.proxy = self.app.Proxy(self.socket, self.frontend, pool_size, backlog)
+        self.frontend = frontend
+        self.proxy = self.app.Proxy(self.name, self.socket, self.frontend,
+                                    pool_size, backlog)
 
     @property
     def host(self):
@@ -29,7 +29,6 @@ class Listener(object):
 
     @in_loop
     def start(self):
-        self.device.start()
         self.proxy.start()
 
     @in_loop
