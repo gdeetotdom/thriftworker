@@ -43,16 +43,17 @@ cdef class ZMQSink(BaseSocket):
     cdef inline read(self):
         assert self.is_readable(), 'sink not readable'
         if self.status == READ_STATUS:
-            self.all_ok = self.struct.unpack(self.socket.recv(NOBLOCK & RCVMORE))
+            self.all_ok = self.struct.unpack(self.socket.recv(NOBLOCK))
             self.status = READ_REPLY
         if self.status == READ_REPLY:
+            assert self.socket.getsockopt(RCVMORE), 'reply truncated'
             self.response = self.socket.recv(NOBLOCK)
             self.status = WAIT_MESSAGE
 
     cdef inline write(self):
         assert self.is_writeable(), 'sink not writable'
         if self.status == SEND_NAME:
-            self.socket.send(self.name, NOBLOCK & SNDMORE)
+            self.socket.send(self.name, NOBLOCK | SNDMORE)
             self.status = SEND_REQUEST
         if self.status == SEND_REQUEST:
             self.socket.send(self.request, NOBLOCK)
