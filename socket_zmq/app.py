@@ -42,17 +42,17 @@ class SocketZMQ(SubclassMixin):
         sock.setblocking(0)
         return sock
 
-    def Proxy(self, address, frontend, pool_size=None, backlog=None):
+    def Proxy(self, socket, frontend, pool_size=None, backlog=None):
         """Create new proxy with given params.
 
-        :param address: tuple consist of (<string>host, <int>port)
+        :param socket: socket that proxy must listen
         :param frontend: address of frontend zeromq socket
         :param pool_size: size of zeromq pool
         :param backlog: size of socket connection queue
 
         """
-        return Proxy(self.loop, self.Socket(address),
-                     self.context, frontend, pool_size, backlog)
+        return Proxy(self.loop, socket, self.context, frontend,
+                     pool_size, backlog)
 
     def Device(self, frontend, backend):
         """Create zeromq device.
