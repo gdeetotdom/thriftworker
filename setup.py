@@ -50,7 +50,7 @@ extensions.append(Extension('socket_zmq.vector_io',
                             sources=[os.path.join('socket_zmq',
                                                   'vector_io.c')]))
 
-package_data = {'socket_zmq': ['*.pxd', '*.pyx']}
+package_data = {'socket_zmq': ['*.pxd', '*.pyx', '*.c']}
 
 # Description, version and other meta information.
 
