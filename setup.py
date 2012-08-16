@@ -46,6 +46,10 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
                     **extension_kwargs)
     extensions.append(ext)
 
+extensions.append(Extension('socket_zmq.vector_io',
+                            sources=[os.path.join('socket_zmq',
+                                                  'vector_io.c')]))
+
 package_data = {'socket_zmq': ['*.pxd', '*.pyx']}
 
 # Description, version and other meta information.

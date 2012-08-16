@@ -11,8 +11,9 @@ cdef enum States:
     WAIT_LEN = 0
     WAIT_MESSAGE = 1
     WAIT_PROCESS = 2
-    SEND_ANSWER = 3
-    CLOSED = 4
+    SEND_LEN = 3
+    SEND_ANSWER = 4
+    CLOSED = 5
 
 
 cdef class Buffer:
@@ -22,7 +23,6 @@ cdef class Buffer:
     cdef object view
 
     cdef resize(self, int size)
-    cdef slice(self, int offset, int size=*)
 
 
 cdef class SocketSource(BaseSocket):
@@ -38,8 +38,10 @@ cdef class SocketSource(BaseSocket):
     cdef ZMQSink sink
     cdef object on_close
     cdef object socket
+    cdef object vector_io
     cdef object address
 
+    cdef Buffer length_buffer
     cdef Buffer buffer
 
     cdef inline bint is_writeable(self)
@@ -47,7 +49,6 @@ cdef class SocketSource(BaseSocket):
     cdef inline bint is_closed(self)
     cdef inline bint is_ready(self)
 
-    cdef inline read_length(self)
     cdef inline read(self)
     cdef inline write(self)
 
