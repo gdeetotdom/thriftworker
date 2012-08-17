@@ -103,7 +103,7 @@ setup(
     ext_modules=extensions,
     packages=['socket_zmq'],
     package_data=package_data,
-    requires=['pyzmq', 'Cython', 'pyev', 'thrift'],
+    requires=['pyev', 'pyzmq'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
                  "Intended Audience :: System Administrators",
