@@ -1,5 +1,5 @@
 cimport cython
-from cpython.mem cimport PyMem_Realloc, PyMem_Free
+from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 
 import _socket
 import errno
@@ -25,20 +25,22 @@ cdef int BUFFER_SIZE = 4096
 
 cdef class Buffer:
 
-    def __cinit__(self):
-        self.length = 0
-        self.handle = NULL
+    def __cinit__(self, int size):
+        self.length = size
+        self.handle = <unsigned char *>PyMem_Malloc(self.length * sizeof(unsigned char))
+        if self.handle == NULL:
+            raise MemoryError()
 
-    def __init__(self):
-        self.view = None
+    def __init__(self, int size):
+        self.view = frombuffer_2(self.handle, self.length, 0)
 
     def __dealloc__(self):
-        if self.handle != NULL:
-            PyMem_Free(self.handle)
+        PyMem_Free(<void *>self.handle)
 
     cdef resize(self, int size):
         if self.length < size:
-            self.handle = PyMem_Realloc(self.handle, self.length * sizeof(unsigned char))
+            self.handle = <unsigned char *>PyMem_Realloc(<void *>self.handle,
+                                                         self.length * sizeof(unsigned char))
             if self.handle == NULL:
                 raise MemoryError()
             self.length = size
@@ -67,11 +69,8 @@ cdef class SocketSource(BaseSocket):
 
         self.struct = Struct(LENGTH_FORMAT)
 
-        self.length_buffer = Buffer()
-        self.length_buffer.resize(LENGTH_SIZE)
-
-        self.buffer = Buffer()
-        self.buffer.resize(BUFFER_SIZE)
+        self.length_buffer = Buffer(LENGTH_SIZE)
+        self.buffer = Buffer(BUFFER_SIZE)
 
         self.address = address
         self.on_close = on_close
@@ -185,7 +184,7 @@ cdef class SocketSource(BaseSocket):
         self.on_close = None
 
         # remove objects
-        self.buffer = None
+        self.length_buffer = self.buffer = None
 
         BaseSocket.close(self)
 
@@ -220,6 +219,18 @@ cdef class SocketSource(BaseSocket):
             self.status = SEND_LEN
             self.wait_writable()
 
+    cdef inline on_readable(self):
+        while self.is_readable():
+            self.read()
+        if self.is_ready():
+            self.sink.ready(self.ready, self.buffer.view[0:self.len])
+
+    cdef inline on_writable(self):
+        while self.is_writeable():
+            self.write()
+        if self.is_readable():
+            self.wait_readable()
+
     cpdef cb_io(self, object watcher, object revents):
         try:
             if revents & EV_WRITE:
@@ -239,15 +250,3 @@ cdef class SocketSource(BaseSocket):
             logger.error(exc, exc_info=1, extra={'host': self.address[0],
                                                  'port': self.address[1]})
             self.close()
-
-    cdef on_readable(self):
-        while self.is_readable():
-            self.read()
-        if self.is_ready():
-            self.sink.ready(self.ready, self.buffer.view[0:self.len])
-
-    cdef on_writable(self):
-        while self.is_writeable():
-            self.write()
-        if self.is_readable():
-            self.wait_readable()

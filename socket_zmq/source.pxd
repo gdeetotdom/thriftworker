@@ -18,7 +18,7 @@ cdef enum States:
 
 cdef class Buffer:
 
-    cdef void *handle
+    cdef unsigned char *handle
     cdef int length
     cdef object view
 
@@ -56,5 +56,5 @@ cdef class SocketSource(BaseSocket):
     cpdef ready(self, object all_ok, object message)
 
     cpdef cb_io(self, object watcher, object revents)
-    cdef on_readable(self)
-    cdef on_writable(self)
+    cdef inline on_readable(self)
+    cdef inline on_writable(self)

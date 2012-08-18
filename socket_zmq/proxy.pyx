@@ -1,3 +1,4 @@
+# cython: profile=True
 import cython
 import errno
 from socket_zmq.pool cimport SinkPool

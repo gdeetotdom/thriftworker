@@ -43,7 +43,7 @@ cdef class ZMQSink(BaseSocket):
     cdef inline read(self):
         assert self.is_readable(), 'sink not readable'
         if self.status == READ_STATUS:
-            self.all_ok = self.struct.unpack(self.socket.recv(NOBLOCK))
+            self.all_ok = self.struct.unpack(self.socket.recv(NOBLOCK))[0]
             self.status = READ_REPLY
         if self.status == READ_REPLY:
             assert self.socket.getsockopt(RCVMORE), 'reply truncated'
@@ -75,6 +75,18 @@ cdef class ZMQSink(BaseSocket):
         self.status = SEND_NAME
         self.wait_writable()
 
+    cdef inline on_readable(self):
+        while self.is_readable():
+            self.read()
+        self.callback(self.all_ok, self.response)
+
+    cdef inline on_writable(self):
+        while self.is_writeable():
+            self.write()
+        if self.is_readable():
+            self.wait_readable()
+            self.on_readable()
+
     cpdef cb_io(self, object watcher, object revents):
         try:
             events = self.socket.getsockopt(EVENTS)
@@ -92,15 +104,3 @@ cdef class ZMQSink(BaseSocket):
         except Exception, exc:
             self.close()
             logger.exception(exc)
-
-    cdef on_readable(self):
-        while self.is_readable():
-            self.read()
-        self.callback(self.all_ok, self.response)
-
-    cdef on_writable(self):
-        while self.is_writeable():
-            self.write()
-        if self.is_readable():
-            self.wait_readable()
-            self.on_readable()
