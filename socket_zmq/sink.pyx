@@ -23,6 +23,7 @@ cdef class ZMQSink(BaseSocket):
         self.socket = socket
         self.status = WAIT_MESSAGE
         BaseSocket.__init__(self, loop, self.socket.getsockopt(FD))
+        self.start_read_watcher()
 
     @cython.profile(False)
     cdef inline bint is_writeable(self):
@@ -37,7 +38,7 @@ cdef class ZMQSink(BaseSocket):
         return self.status == WAIT_MESSAGE
 
     @cython.profile(False)
-    cdef inline bint is_closed(self):
+    cpdef is_closed(self):
         return self.status == CLOSED
 
     cdef inline read(self):
@@ -73,34 +74,42 @@ cdef class ZMQSink(BaseSocket):
         self.callback = callback
         self.request = request
         self.status = SEND_NAME
-        self.wait_writable()
+
+        # Try to write received message.
+        self.on_writable()
+        if self.is_writeable():
+            self.start_write_watcher()
 
     cdef inline on_readable(self):
-        while self.is_readable():
-            self.read()
-        self.callback(self.all_ok, self.response)
-
-    cdef inline on_writable(self):
-        while self.is_writeable():
-            self.write()
-        if self.is_readable():
-            self.wait_readable()
-            self.on_readable()
-
-    cpdef cb_io(self, object watcher, object revents):
         try:
-            events = self.socket.getsockopt(EVENTS)
-            if events & POLLOUT:
-                self.on_writable()
-            if events & POLLIN:
-                self.on_readable()
+            while self.is_readable():
+                self.read()
 
         except ZMQError, exc:
-            if exc.errno == EAGAIN:
-                return
-            self.close()
-            logger.exception(exc)
+            if exc.errno != EAGAIN:
+                raise
 
-        except Exception, exc:
-            self.close()
-            logger.exception(exc)
+        else:
+            if self.is_ready():
+                self.callback(self.all_ok, self.response)
+                self.all_ok = self.response = self.callback = None
+
+    cdef inline on_writable(self):
+        try:
+            while self.is_writeable():
+                self.write()
+            self.stop_write_watcher()
+
+        except ZMQError, exc:
+            if exc.errno != EAGAIN:
+                raise
+
+        else:
+            if self.is_readable():
+                self.on_readable()
+
+    cpdef cb_readable(self, object watcher, object revents):
+        self.on_readable()
+
+    cpdef cb_writable(self, object watcher, object revents):
+        self.on_writable()

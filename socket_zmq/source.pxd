@@ -46,8 +46,8 @@ cdef class SocketSource(BaseSocket):
 
     cdef inline bint is_writeable(self)
     cdef inline bint is_readable(self)
-    cdef inline bint is_closed(self)
     cdef inline bint is_ready(self)
+    cpdef is_closed(self)
 
     cdef inline read(self)
     cdef inline write(self)
@@ -55,6 +55,8 @@ cdef class SocketSource(BaseSocket):
     cpdef close(self)
     cpdef ready(self, object all_ok, object message)
 
-    cpdef cb_io(self, object watcher, object revents)
     cdef inline on_readable(self)
     cdef inline on_writable(self)
+
+    cpdef cb_readable(self, object watcher, object revents)
+    cpdef cb_writable(self, object watcher, object revents)

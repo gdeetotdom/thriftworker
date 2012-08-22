@@ -81,6 +81,8 @@ cdef class SocketSource(BaseSocket):
 
         BaseSocket.__init__(self, loop, self.socket.fileno())
 
+        self.start_read_watcher()
+
     @cython.profile(False)
     cdef inline bint is_writeable(self):
         """Returns ``True`` if source is writable."""
@@ -92,14 +94,14 @@ cdef class SocketSource(BaseSocket):
         return self.status == WAIT_LEN or self.status == WAIT_MESSAGE
 
     @cython.profile(False)
-    cdef inline bint is_closed(self):
-        """Returns ``True`` if source is closed."""
-        return self.status == CLOSED
-
-    @cython.profile(False)
     cdef inline bint is_ready(self):
         """Returns ``True`` if source is ready."""
         return self.status == WAIT_PROCESS
+
+    @cython.profile(False)
+    cpdef is_closed(self):
+        """Returns ``True`` if source is closed."""
+        return self.status == CLOSED
 
     @cython.locals(received=cython.int, message_length=cython.int)
     cdef inline read(self):
@@ -110,12 +112,14 @@ cdef class SocketSource(BaseSocket):
         if self.status == WAIT_LEN:
             received = self.vector_io.recvmsg_into((self.length_buffer.view,
                                                     self.buffer.view))[0]
+
             if received == 0:
                 # if we read 0 bytes and message is empty, it means client
                 # close connection
                 self.close()
                 return
-            assert received >= LENGTH_SIZE, "message length can't be read"
+
+            assert received > LENGTH_SIZE, "message length can't be read"
 
             message_length = self.struct.unpack_from(self.length_buffer.view)[0]
             assert message_length > 0, "negative or empty frame size, it seems" \
@@ -131,7 +135,11 @@ cdef class SocketSource(BaseSocket):
             received = self.socket.recv_into(self.buffer.view[self.recv_bytes:self.len],
                                              self.len - self.recv_bytes)
 
-        assert received > 0, "can't read frame from socket"
+            if received == 0:
+                # if we read 0 bytes and message is empty, it means client
+                # close connection
+                self.close()
+                return
 
         self.recv_bytes += received
         if self.recv_bytes == self.len:
@@ -203,8 +211,7 @@ cdef class SocketSource(BaseSocket):
             self.close()
             return
 
-        message_length = len(message)
-        self.len = message_length
+        message_length = self.len = len(message)
 
         if message_length == 0:
             # it was a oneway request, do not write answer
@@ -217,36 +224,37 @@ cdef class SocketSource(BaseSocket):
             # copy message to buffer
             self.buffer.view[0:self.len] = message
             self.status = SEND_LEN
-            self.wait_writable()
+
+            # Try to write message right now.
+            self.on_writable()
+            if self.is_writeable():
+                self.start_write_watcher()
 
     cdef inline on_readable(self):
-        while self.is_readable():
-            self.read()
-        if self.is_ready():
-            self.sink.ready(self.ready, self.buffer.view[0:self.len])
-
-    cdef inline on_writable(self):
-        while self.is_writeable():
-            self.write()
-        if self.is_readable():
-            self.wait_readable()
-
-    cpdef cb_io(self, object watcher, object revents):
         try:
-            if revents & EV_WRITE:
-                self.on_writable()
-            elif revents & EV_READ:
-                self.on_readable()
+            while self.is_readable():
+                self.read()
 
         except _socket.error, exc:
-            if exc.errno in NONBLOCKING:
-                # socket can't be processed now, return
-                return
-            logger.error(exc, exc_info=1, extra={'host': self.address[0],
-                                                 'port': self.address[1]})
-            self.close()
+            if exc.errno not in NONBLOCKING:
+                raise
 
-        except Exception, exc:
-            logger.error(exc, exc_info=1, extra={'host': self.address[0],
-                                                 'port': self.address[1]})
-            self.close()
+        else:
+            if self.is_ready():
+                self.sink.ready(self.ready, self.buffer.view[0:self.len])
+
+    cdef inline on_writable(self):
+        try:
+            while self.is_writeable():
+                self.write()
+            self.stop_write_watcher()
+
+        except _socket.error, exc:
+            if exc.errno not in NONBLOCKING:
+                raise
+
+    cpdef cb_readable(self, object watcher, object revents):
+        self.on_readable()
+
+    cpdef cb_writable(self, object watcher, object revents):
+        self.on_writable()

@@ -6,6 +6,9 @@ from socket_zmq.source cimport SocketSource
 from zmq.core.context cimport Context
 import _socket
 from pyev import EV_READ, EV_MINPRI, Io
+import logging
+
+logger = logging.getLogger(__name__)
 
 NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
@@ -29,8 +32,11 @@ cdef class Proxy(object):
         while True:
             try:
                 result = self.socket.accept()
-            except _socket.error, err:
-                if err[0] in NONBLOCKING:
+            except _socket.error as exc:
+                if exc[0] in NONBLOCKING:
+                    return
+                elif exc[0] == errno.EMFILE:
+                    logger.exception(exc)
                     return
                 raise
             client_socket = result[0]
@@ -54,5 +60,7 @@ cdef class Proxy(object):
         self.socket.close()
         self.watcher.stop()
         while self.connections:
-            self.connections.pop().close()
+            connection = self.connections.pop()
+            if not connection.is_closed():
+                connection.close()
         self.pool.close()
