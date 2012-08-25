@@ -1,23 +1,41 @@
 """Combine device and proxy together. Workers must connect to device backend.
 
 """
-from .utils import in_loop
+from __future__ import absolute_import
+
+import socket
+
+from .proxy import Proxy
+from .utils import in_loop, cached_property
 
 __all__ = ['Listener']
 
 
 class Listener(object):
-    """Facade for proxy."""
+    """Facade for proxy. Support lazy initialization."""
 
     app = None
 
-    def __init__(self, name, address, frontend=None, pool_size=None, backlog=None):
+    def __init__(self, name, address, frontend=None, backlog=None):
+        """Create new listener.
+
+        :param name: service name
+        :param address: address of socket
+        :param backlog: size of socket connection queue
+
+        """
         self.name = name
-        self.loop = self.app.loop
-        self.socket = self.app.Socket(address)
-        self.frontend = frontend or self.app.frontend_endpoint
-        self.proxy = self.app.Proxy(self.name, self.socket, self.frontend,
-                                    pool_size, backlog)
+        self.address = address
+        self.backlog = backlog
+
+    @cached_property
+    def socket(self):
+        """A shortcut to create a TCP socket and bind it."""
+        sock = socket.socket(family=socket.AF_INET)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(self.address)
+        sock.setblocking(0)
+        return sock
 
     @property
     def host(self):
@@ -28,6 +46,17 @@ class Listener(object):
     def port(self):
         """Return binded port number."""
         return self.socket.getsockname()[1]
+
+    @property
+    def loop(self):
+        """Shortcut to loop."""
+        return self.app.loop
+
+    @cached_property
+    def proxy(self):
+        """Create new proxy with given parameters."""
+        return Proxy(self.loop, self.name, self.socket, self.app.sync_pool,
+                     self.backlog)
 
     @in_loop
     def start(self):

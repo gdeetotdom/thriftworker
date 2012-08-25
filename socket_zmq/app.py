@@ -5,13 +5,14 @@ Distribute thrift requests between workers.
 """
 from __future__ import absolute_import
 
-import socket
-
 from pyev import default_loop, recommended_backends
 from thrift.protocol import TBinaryProtocol
 
+from .constants import POOL_SIZE
+from .device import Device
 from .listener import Listener
-from .proxy import Proxy
+from .loop import LoopContainer
+from .pool import SinkPool
 from .worker import Worker
 from .utils import cached_property, SubclassMixin, detect_environment
 
@@ -22,7 +23,8 @@ class SocketZMQ(SubclassMixin):
     """Factory for socket_zmq."""
 
     def __init__(self, frontend_endpoint=None, backend_endpoint=None,
-                 loop=None, context=None, protocol_factory=None):
+                 loop=None, context=None, protocol_factory=None,
+                 pool_size=None):
         # Set provided instance if we can.
         if loop is not None:
             self.loop = loop
@@ -36,6 +38,7 @@ class SocketZMQ(SubclassMixin):
             frontend_endpoint or 'inproc://front{0}'.format(id(self))
         self.backend_endpoint = \
             backend_endpoint or 'inproc://back{0}'.format(id(self))
+        self.pool_size = pool_size or POOL_SIZE
 
         super(SocketZMQ, self).__init__()
 
@@ -43,6 +46,11 @@ class SocketZMQ(SubclassMixin):
     def loop(self):
         """Create event loop. Should be running in separate thread."""
         return default_loop(flags=recommended_backends())
+
+    @cached_property
+    def loop_container(self):
+        """Instance of bounded :class:`LoopContainer`."""
+        return self.LoopContainer()
 
     @cached_property
     def context(self):
@@ -62,35 +70,26 @@ class SocketZMQ(SubclassMixin):
         """Specify which protocol should be used."""
         return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
-    def Socket(self, address):
-        """A shortcut to create a TCP socket and bind it.
+    @cached_property
+    def sync_pool(self):
+        """Instance of :class:`SyncPool`."""
+        return SinkPool(self.loop, self.context, self.frontend_endpoint,
+                        self.pool_size)
 
-        :param address: string consist of <host>:<port>
-
-        """
-        sock = socket.socket(family=socket.AF_INET)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(address)
-        sock.setblocking(0)
-        return sock
-
-    def Proxy(self, name, socket, frontend, pool_size=None, backlog=None):
-        """Create new proxy with given params.
-
-        :param name: service name
-        :param socket: socket that proxy must listen
-        :param frontend: address of frontend zeromq socket
-        :param pool_size: size of zeromq pool
-        :param backlog: size of socket connection queue
-
-        """
-        return Proxy(self.loop, name, socket, self.context, frontend,
-                     pool_size, backlog)
+    @cached_property
+    def LoopContainer(self):
+        """Create bounded :class:`LoopContainer` class."""
+        return self.subclass_with_self(LoopContainer)
 
     @cached_property
     def Listener(self):
         """Create bounded :class:`Listener` class."""
         return self.subclass_with_self(Listener)
+
+    @cached_property
+    def Device(self):
+        """Create bounded :class:`Device` class."""
+        return self.subclass_with_self(Device)
 
     @cached_property
     def Worker(self):

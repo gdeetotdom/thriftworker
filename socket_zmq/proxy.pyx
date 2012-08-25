@@ -1,30 +1,29 @@
-# cython: profile=True
-import cython
-import errno
-from socket_zmq.pool cimport SinkPool
-from socket_zmq.source cimport SocketSource
-from zmq.core.context cimport Context
 import _socket
-from pyev import EV_READ, EV_MINPRI, Io
 import logging
+import errno
+
+import cython
+from pyev import EV_READ, EV_MINPRI, Io
+
+from .constants import BACKLOG_SIZE, NONBLOCKING
+from .pool cimport SinkPool
+from .source cimport SocketSource
+
+__all__ = ['Proxy']
 
 logger = logging.getLogger(__name__)
-
-NONBLOCKING = (errno.EAGAIN, errno.EWOULDBLOCK)
 
 
 cdef class Proxy(object):
 
-    def __init__(self, object loop, object name, object socket, Context context,
-                 object frontend, object pool_size=None, object backlog=None):
+    def __init__(self, object loop, object name, object socket,
+                 SinkPool pool, object backlog=None):
         self.connections = set()
         self.loop = loop
         self.name = name
         self.socket = socket._sock
-        self.context = context
-        self.pool = SinkPool(self.loop, self.context, self.name,
-                             frontend, pool_size or 1024)
-        self.backlog = backlog or 1024
+        self.pool = pool
+        self.backlog = backlog or BACKLOG_SIZE
         self.watcher = Io(self.socket, EV_READ, self.loop,
                           self.on_connection, priority=EV_MINPRI)
 
@@ -45,9 +44,8 @@ cdef class Proxy(object):
             client_socket.setsockopt(_socket.SOL_TCP, _socket.TCP_NODELAY, 1)
             # Set TOS to IPTOS_LOWDELAY.
             client_socket.setsockopt(_socket.IPPROTO_IP, _socket.IP_TOS, 0x10)
-            self.connections.add(SocketSource(self.pool, self.loop,
-                                              client_socket, result[1],
-                                              self.on_close))
+            self.connections.add(SocketSource(self.name, self.pool, self.loop,
+                                              client_socket, self.on_close))
 
     def on_close(self, SocketSource source):
         try:
@@ -66,4 +64,3 @@ cdef class Proxy(object):
             connection = self.connections.pop()
             if not connection.is_closed():
                 connection.close()
-        self.pool.close()

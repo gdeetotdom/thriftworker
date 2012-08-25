@@ -39,7 +39,7 @@ cdef class SocketSource(BaseSocket):
     cdef object on_close
     cdef object socket
     cdef object vector_io
-    cdef object address
+    cdef object name
 
     cdef Buffer length_buffer
     cdef Buffer buffer

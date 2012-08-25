@@ -20,9 +20,8 @@ logger = getLogger(__name__)
 
 cdef class ZMQSink(BaseSocket):
 
-    def __init__(self, object loop, object name, Socket socket):
-        self.all_ok = self.response = self.request = self.callback = None
-        self.name = name
+    def __init__(self, object loop, Socket socket):
+        self.all_ok = self.response = self.request = self.name = self.callback = None
         self.struct = Struct(STATUS_FORMAT)
         self.socket = socket
         self.status = WAIT_MESSAGE
@@ -72,11 +71,12 @@ cdef class ZMQSink(BaseSocket):
         assert not self.is_closed(), 'sink already closed'
         self.status = CLOSED
         self.socket.close()
-        self.all_ok = self.response = self.request = self.callback = None
+        self.all_ok = self.response = self.request = self.name = self.callback = None
         BaseSocket.close(self)
 
-    cpdef ready(self, object callback, object request):
+    cpdef ready(self, object name, object callback, object request):
         assert self.is_ready(), 'sink not ready'
+        self.name = name
         self.callback = callback
         self.request = request
         self.status = SEND_NAME

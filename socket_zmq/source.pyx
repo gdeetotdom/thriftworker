@@ -1,5 +1,4 @@
 import _socket
-import errno
 from logging import getLogger
 from struct import Struct
 
@@ -8,7 +7,7 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from pyev import EV_READ, EV_WRITE, EV_ERROR
 from zmq.utils.buffers cimport frombuffer_2
 
-from .constants import LENGTH_FORMAT, LENGTH_SIZE, BUFFER_SIZE
+from .constants import LENGTH_FORMAT, LENGTH_SIZE, BUFFER_SIZE, NONBLOCKING
 from .pool cimport SinkPool
 from .base cimport BaseSocket
 from .sink cimport ZMQSink
@@ -17,8 +16,6 @@ from .vector_io import vector_io
 __all__ = ['SocketSource']
 
 logger = getLogger(__name__)
-
-NONBLOCKING = {errno.EAGAIN, errno.EWOULDBLOCK}
 
 
 cdef class Buffer:
@@ -59,8 +56,9 @@ cdef class SocketSource(BaseSocket):
 
     """
 
-    def __init__(self, SinkPool pool, object loop, object socket,
-                 object address, object on_close):
+    def __init__(self, object name, SinkPool pool, object loop, object socket,
+                 object on_close):
+        self.name = name
 
         self.sent_bytes = self.recv_bytes = self.len = 0
         self.status = WAIT_LEN
@@ -70,7 +68,6 @@ cdef class SocketSource(BaseSocket):
         self.length_buffer = Buffer(LENGTH_SIZE)
         self.buffer = Buffer(BUFFER_SIZE)
 
-        self.address = address
         self.on_close = on_close
         self.socket = socket
         self.vector_io = vector_io(socket.family, socket.fileno())
@@ -241,7 +238,7 @@ cdef class SocketSource(BaseSocket):
 
         else:
             if self.is_ready() and self.sink.is_ready():
-                self.sink.ready(self.ready, self.buffer.view[0:self.len])
+                self.sink.ready(self.name, self.ready, self.buffer.view[0:self.len])
 
             elif self.is_ready():
                 self.close()
