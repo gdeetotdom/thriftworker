@@ -1,5 +1,6 @@
-from socket_zmq.sink cimport ZMQSink
 from zmq.core.context cimport Context
+
+from .sink cimport ZMQSink
 
 
 cdef class SinkPool(object):

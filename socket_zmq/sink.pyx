@@ -1,17 +1,21 @@
-cimport cython
+"""Describe ZMQ endpoint."""
 from logging import getLogger
+from struct import Struct
+
+cimport cython
+from cpython cimport bool
 from pyev import EV_ERROR
 from zmq.core.constants import (NOBLOCK, EAGAIN, FD, EVENTS, POLLIN, POLLOUT,
     RCVMORE, SNDMORE)
 from zmq.core.error import ZMQError
-from cpython cimport bool
 from zmq.core.socket cimport Socket
-from socket_zmq.base cimport BaseSocket
-from struct import Struct
+
+from .base cimport BaseSocket
+from .constants import STATUS_FORMAT
+
+__all__ = ['ZMQSink']
 
 logger = getLogger(__name__)
-
-STATUS_FORMAT = '!?'
 
 
 cdef class ZMQSink(BaseSocket):
@@ -46,6 +50,7 @@ cdef class ZMQSink(BaseSocket):
         if self.status == READ_STATUS:
             self.all_ok = self.struct.unpack(self.socket.recv(NOBLOCK))[0]
             self.status = READ_REPLY
+
         if self.status == READ_REPLY:
             assert self.socket.getsockopt(RCVMORE), 'reply truncated'
             self.response = self.socket.recv(NOBLOCK)
@@ -56,6 +61,7 @@ cdef class ZMQSink(BaseSocket):
         if self.status == SEND_NAME:
             self.socket.send(self.name, NOBLOCK | SNDMORE)
             self.status = SEND_REQUEST
+
         if self.status == SEND_REQUEST:
             self.socket.send(self.request, NOBLOCK)
             self.request = None
@@ -109,7 +115,15 @@ cdef class ZMQSink(BaseSocket):
                 self.on_readable()
 
     cpdef cb_readable(self, object watcher, object revents):
-        self.on_readable()
+        try:
+            self.on_readable()
+        except Exception as exc:
+            logger.exception(exc)
+            self.close()
 
     cpdef cb_writable(self, object watcher, object revents):
-        self.on_writable()
+        try:
+            self.on_writable()
+        except Exception as exc:
+            logger.exception(exc)
+            self.close()

@@ -1,26 +1,24 @@
-cimport cython
-from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
-
 import _socket
 import errno
 from logging import getLogger
-from struct import Struct, calcsize, pack_into
+from struct import Struct
 
+cimport cython
+from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from pyev import EV_READ, EV_WRITE, EV_ERROR
 from zmq.utils.buffers cimport frombuffer_2
 
-from socket_zmq.pool cimport SinkPool
-from socket_zmq.base cimport BaseSocket
-from socket_zmq.sink cimport ZMQSink
-from socket_zmq.vector_io import vector_io
+from .constants import LENGTH_FORMAT, LENGTH_SIZE, BUFFER_SIZE
+from .pool cimport SinkPool
+from .base cimport BaseSocket
+from .sink cimport ZMQSink
+from .vector_io import vector_io
+
+__all__ = ['SocketSource']
 
 logger = getLogger(__name__)
 
-
 NONBLOCKING = {errno.EAGAIN, errno.EWOULDBLOCK}
-LENGTH_FORMAT = '!i'
-cdef int LENGTH_SIZE = calcsize(LENGTH_FORMAT)
-cdef int BUFFER_SIZE = 4096
 
 
 cdef class Buffer:
@@ -182,9 +180,11 @@ cdef class SocketSource(BaseSocket):
         if self.sink.is_ready():
             # sink is ready, return to pool
             self.pool.put(self.sink)
+
         elif not self.sink.is_closed():
             # sink is not closed, close it
             self.sink.close()
+
         self.pool = self.sink = None
 
         # execute callback
@@ -240,8 +240,11 @@ cdef class SocketSource(BaseSocket):
                 raise
 
         else:
-            if self.is_ready():
+            if self.is_ready() and self.sink.is_ready():
                 self.sink.ready(self.ready, self.buffer.view[0:self.len])
+
+            elif self.is_ready():
+                self.close()
 
     cdef inline on_writable(self):
         try:
@@ -254,7 +257,15 @@ cdef class SocketSource(BaseSocket):
                 raise
 
     cpdef cb_readable(self, object watcher, object revents):
-        self.on_readable()
+        try:
+            self.on_readable()
+        except Exception as exc:
+            logger.exception(exc)
+            self.close()
 
     cpdef cb_writable(self, object watcher, object revents):
-        self.on_writable()
+        try:
+            self.on_writable()
+        except Exception as exc:
+            logger.exception(exc)
+            self.close()

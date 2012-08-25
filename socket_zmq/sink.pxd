@@ -1,6 +1,6 @@
-# cython: profile=True
 from zmq.core.socket cimport Socket
-from socket_zmq.base cimport BaseSocket
+
+from .base cimport BaseSocket
 
 
 cdef enum States:

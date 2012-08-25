@@ -10,4 +10,4 @@ __docformat__ = 'restructuredtext'
 
 # -eof meta-
 
-from socket_zmq.app import SocketZMQ
+from .app import SocketZMQ

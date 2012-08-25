@@ -1,6 +1,8 @@
 """Contains class:`BaseSocket`."""
 from pyev import Io, EV_READ, EV_WRITE
 
+__all__ = ['BaseSocket']
+
 
 cdef class BaseSocket:
     """Base class for sources and sinks."""

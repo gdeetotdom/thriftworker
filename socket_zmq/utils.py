@@ -7,9 +7,17 @@ This file was copied and adapted from celery.
 
 """
 from __future__ import absolute_import
+
+import sys
 from functools import wraps
 
-__all__ = ['cached_property', 'SubclassMixin', 'in_loop']
+from .constants import DEFAULT_ENV, GEVENT_ENV
+
+__all__ = ['cached_property', 'SubclassMixin', 'in_loop', 'thread',
+           'detect_environment']
+
+_realthread = None
+_environment = None
 
 
 class cached_property(object):
@@ -125,3 +133,53 @@ def in_loop(func):
         async.send()
 
     return inner_decorator
+
+
+def get_realthread():
+    """Get the real Python thread module, regardless of any monkeypatching"""
+    global _realthread
+    if _realthread:
+        return _realthread
+
+    import imp
+    fp, pathname, description = imp.find_module('thread')
+    try:
+        _realthread = imp.load_module('realthread', fp, pathname, description)
+        return _realthread
+    finally:
+        if fp:
+            fp.close()
+
+
+def thread(func):
+    """Thread decorator.
+
+    Takes a function and spawns it as a daemon thread using the
+    real OS thread regardless of monkey patching.
+
+    """
+    get_realthread().start_new_thread(func, ())
+    return func
+
+
+def _detect_environment():
+
+    # -gevent-
+    if 'gevent' in sys.modules:
+        try:
+            from gevent import socket as _gsocket
+            import socket
+
+            if socket.socket is _gsocket.socket:
+                return GEVENT_ENV
+        except ImportError:
+            pass
+
+    return DEFAULT_ENV
+
+
+def detect_environment():
+    global _environment
+    if _environment is None:
+        _environment = _detect_environment()
+    return _environment

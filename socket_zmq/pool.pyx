@@ -1,9 +1,14 @@
-from collections import deque
+"""Pool of ZMQ sockets."""
 import cython
-from socket_zmq.sink cimport ZMQSink
+from collections import deque
+
+from zmq.core.constants import REQ
 from zmq.core.context cimport Context
 from zmq.core.socket cimport Socket
-from zmq import REQ
+
+from .sink cimport ZMQSink
+
+__all__ = ['SinkPool']
 
 
 cdef class SinkPool(object):
@@ -34,10 +39,14 @@ cdef class SinkPool(object):
 
     cdef inline put(self, ZMQSink sink):
         if len(self.pool) >= self.size:
-            sink.close()
+            if not sink.is_closed():
+                sink.close()
         else:
             self.pool.append(sink)
 
+    @cython.locals(sink=ZMQSink)
     cpdef close(self):
         while self.pool:
-            self.pool.pop().close()
+            sink = self.pool.pop()
+            if not sink.is_closed():
+                sink.close()

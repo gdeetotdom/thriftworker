@@ -1,6 +1,6 @@
-from socket_zmq.base cimport BaseSocket
-from socket_zmq.pool cimport SinkPool
-from socket_zmq.sink cimport ZMQSink
+from .base cimport BaseSocket
+from .pool cimport SinkPool
+from .sink cimport ZMQSink
 
 
 cdef extern from "Python.h":

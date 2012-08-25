@@ -41,7 +41,10 @@ cdef class Proxy(object):
                 raise
             client_socket = result[0]
             client_socket.setblocking(0)
+            # Disable the Nagle algorithm.
             client_socket.setsockopt(_socket.SOL_TCP, _socket.TCP_NODELAY, 1)
+            # Set TOS to IPTOS_LOWDELAY.
+            client_socket.setsockopt(_socket.IPPROTO_IP, _socket.IP_TOS, 0x10)
             self.connections.add(SocketSource(self.pool, self.loop,
                                               client_socket, result[1],
                                               self.on_close))

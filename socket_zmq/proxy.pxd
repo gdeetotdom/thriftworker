@@ -1,5 +1,6 @@
-from socket_zmq.pool cimport SinkPool
 from zmq.core.context cimport Context
+
+from .pool cimport SinkPool
 
 
 cdef class Proxy:
