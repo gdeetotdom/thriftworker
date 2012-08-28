@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import logging
+from threading import Event
 
 from zmq.core.context import ZMQError
 from zmq.core.socket import Socket
@@ -23,6 +24,7 @@ class Device(object):
     def __init__(self, frontend_endpoint=None, backend_endpoint=None):
         self.frontend_endpoint = frontend_endpoint or self.app.frontend_endpoint
         self.backend_endpoint = backend_endpoint or self.app.backend_endpoint
+        self._started = Event()
         super(Device, self).__init__()
 
     @cached_property
@@ -41,10 +43,14 @@ class Device(object):
 
     def start(self):
         spawn(self.run)
+        self._started.wait()
 
     def run(self):
+        frontend_socket = self.frontend_socket
+        backend_socket = self.backend_socket
+        self._started.set()
         try:
-            device(QUEUE, self.frontend_socket, self.backend_socket)
+            device(QUEUE, frontend_socket, backend_socket)
         except ZMQError as exc:
             if exc.errno != ENOTSOCK and exc.strerror != 'Context was terminated':
                 raise
