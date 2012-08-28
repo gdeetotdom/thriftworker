@@ -77,6 +77,11 @@ class SocketZMQ(SubclassMixin):
                         self.pool_size)
 
     @cached_property
+    def device(self):
+        """Instance of bounded :class:`Device`."""
+        return self.Device()
+
+    @cached_property
     def LoopContainer(self):
         """Create bounded :class:`LoopContainer` class."""
         return self.subclass_with_self(LoopContainer)

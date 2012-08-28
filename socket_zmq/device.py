@@ -8,7 +8,7 @@ from zmq.core.socket import Socket
 from zmq.core.constants import ROUTER, DEALER, QUEUE, ENOTSOCK
 from zmq.core import device
 
-from .utils import cached_property
+from .utils import cached_property, spawn
 
 __all__ = ['Device']
 
@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 class Device(object):
     """Wrapper around ZMQ device."""
+
+    app = None
 
     def __init__(self, frontend_endpoint=None, backend_endpoint=None):
         self.frontend_endpoint = frontend_endpoint or self.app.frontend_endpoint
@@ -36,6 +38,9 @@ class Device(object):
         socket = Socket(self.app.context, DEALER)
         socket.bind(self.backend_endpoint)
         return socket
+
+    def start(self):
+        spawn(self.run)
 
     def run(self):
         try:
