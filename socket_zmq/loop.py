@@ -1,6 +1,8 @@
 """Container for event loop. Prevent loop to exit when no watchers exists."""
 from __future__ import absolute_import
 
+from threading import Event
+
 from .utils import spawn, in_loop
 
 __all__ = ['LoopContainer']
@@ -13,6 +15,7 @@ class LoopContainer(object):
 
     def __init__(self):
         self._guard_watcher = None
+        self._started = Event()
 
     @property
     def loop(self):
@@ -21,6 +24,7 @@ class LoopContainer(object):
 
     def _run(self):
         """Run event loop."""
+        self._started.set()
         self.app.loop.start()
 
     def start(self):
@@ -28,6 +32,7 @@ class LoopContainer(object):
         watcher = self._guard_watcher = self.loop.async(lambda *args: None)
         watcher.start()
         spawn(self._run)
+        self._started.wait()
 
     @in_loop
     def _shutdown(self):
