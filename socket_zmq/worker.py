@@ -7,10 +7,10 @@ from struct import Struct
 import logging
 
 from thrift.transport.TTransport import TMemoryBuffer
-from zmq.core.constants import EAGAIN, POLLIN, REP, NOBLOCK
+from zmq.core.constants import EAGAIN, POLLIN, REP, NOBLOCK, PULL, PUSH
 from zmq.core.context import ZMQError
 
-from .constants import STATUS_FORMAT, DEFAULT_ENV, GEVENT_ENV, RCVTIMEO
+from .constants import STATUS_FORMAT, DEFAULT_ENV, GEVENT_ENV
 from .utils import cached_property, detect_environment
 
 __all__ = ['Worker']
@@ -25,6 +25,7 @@ class Worker(object):
 
     def __init__(self, processors=None, backend_endpoint=None):
         self.processors = {} if processors is None else processors
+        self.notify_endpoint = 'inproc://notify{0}'.format(id(self))
         self.backend_endpoint = backend_endpoint or self.app.backend_endpoint
         self.formatter = Struct(STATUS_FORMAT)
         self.out_factory = self.in_factory = self.app.protocol_factory
@@ -36,6 +37,18 @@ class Worker(object):
         socket = self.app.context.socket(REP)
         socket.connect(self.backend_endpoint)
         return socket
+
+    @cached_property
+    def notify_socket(self):
+        socket = self.app.context.socket(PULL)
+        socket.bind(self.notify_endpoint)
+        return socket
+
+    def wakeup(self):
+        socket = self.app.context.socket(PUSH)
+        socket.connect(self.notify_endpoint)
+        socket.send('')
+        socket.close()
 
     @cached_property
     def poller(self):
@@ -78,30 +91,38 @@ class Worker(object):
         assert self.started, 'worker not started'
         process = self.process
         poller = self.poller
+        notify_socket = self.notify_socket
+        poller.register(notify_socket, POLLIN)
         socket = self.socket
         poller.register(socket, POLLIN)
 
         def loop():
             """Process incoming requests until all messages are exhausted."""
-            if not poller.poll(RCVTIMEO):
-                # No message received.
-                return
-            try:
-                while True:
-                    # Exhaust incoming messages.
-                    process(socket)
-            except ZMQError as exc:
-                if exc.errno != EAGAIN:
-                    raise
+            for sock, event in poller.poll():
+                if sock is socket:
+                    # Process incoming messages.
+                    try:
+                        while True:
+                            # Exhaust incoming messages.
+                            process(socket)
+                    except ZMQError as exc:
+                        if exc.errno != EAGAIN:
+                            raise
+                elif sock is notify_socket:
+                    # Receive wake-up message.
+                    notify_socket.recv()
 
         try:
             while self.started:
                 loop()
         finally:
             poller.unregister(socket)
+            poller.unregister(notify_socket)
             socket.close()
+            notify_socket.close()
 
     def stop(self):
         """Stop worker."""
         assert self.started, 'worker not started'
         self.started = False
+        self.wakeup()
