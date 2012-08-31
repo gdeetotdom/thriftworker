@@ -28,24 +28,23 @@ cdef class Proxy(object):
                           self.on_connection, priority=EV_MINPRI)
 
     def on_connection(self, object watcher, object revents):
-        while True:
-            try:
-                result = self.socket.accept()
-            except _socket.error as exc:
-                if exc[0] in NONBLOCKING:
-                    return
-                elif exc[0] == errno.EMFILE:
-                    logger.exception(exc)
-                    return
-                raise
-            client_socket = result[0]
-            client_socket.setblocking(0)
-            # Disable the Nagle algorithm.
-            client_socket.setsockopt(_socket.SOL_TCP, _socket.TCP_NODELAY, 1)
-            # Set TOS to IPTOS_LOWDELAY.
-            client_socket.setsockopt(_socket.IPPROTO_IP, _socket.IP_TOS, 0x10)
-            self.connections.add(SocketSource(self.name, self.pool, self.loop,
-                                              client_socket, self.on_close))
+        try:
+            result = self.socket.accept()
+        except _socket.error as exc:
+            if exc[0] in NONBLOCKING:
+                return
+            elif exc[0] == errno.EMFILE:
+                logger.exception(exc)
+                return
+            raise
+        client_socket = result[0]
+        client_socket.setblocking(0)
+        # Disable the Nagle algorithm.
+        client_socket.setsockopt(_socket.SOL_TCP, _socket.TCP_NODELAY, 1)
+        # Set TOS to IPTOS_LOWDELAY.
+        client_socket.setsockopt(_socket.IPPROTO_IP, _socket.IP_TOS, 0x10)
+        self.connections.add(SocketSource(self.name, self.pool, self.loop,
+                                          client_socket, self.on_close))
 
     def on_close(self, SocketSource source):
         try:

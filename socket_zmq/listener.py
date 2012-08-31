@@ -16,7 +16,7 @@ class Listener(object):
 
     app = None
 
-    def __init__(self, name, address, frontend=None, backlog=None):
+    def __init__(self, name, address, backlog=None):
         """Create new listener.
 
         :param name: service name

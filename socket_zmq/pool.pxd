@@ -9,7 +9,7 @@ cdef class SinkPool(object):
     cdef object loop
     cdef object pool
     cdef Context context
-    cdef object frontend
+    cdef object worker_endpoints
 
     cdef inline ZMQSink create(self)
     cdef inline ZMQSink get(self)

@@ -5,6 +5,7 @@ from __future__ import absolute_import
 
 from struct import Struct
 import logging
+from threading import Event
 
 from thrift.transport.TTransport import TMemoryBuffer
 from zmq.core.constants import EAGAIN, POLLIN, REP, NOBLOCK, PULL, PUSH
@@ -23,19 +24,20 @@ class Worker(object):
 
     app = None
 
-    def __init__(self, processors=None, backend_endpoint=None):
+    def __init__(self, processors=None):
         self.processors = {} if processors is None else processors
         self.notify_endpoint = 'inproc://notify{0}'.format(id(self))
-        self.backend_endpoint = backend_endpoint or self.app.backend_endpoint
+        self.worker_endpoint = 'inproc://worker{0}'.format(id(self))
         self.formatter = Struct(STATUS_FORMAT)
         self.out_factory = self.in_factory = self.app.protocol_factory
         self.started = False
+        self._started_event = Event()
         super(Worker, self).__init__()
 
     @cached_property
     def socket(self):
         socket = self.app.context.socket(REP)
-        socket.connect(self.backend_endpoint)
+        socket.bind(self.worker_endpoint)
         return socket
 
     @cached_property
@@ -49,6 +51,9 @@ class Worker(object):
         socket.connect(self.notify_endpoint)
         socket.send('')
         socket.close()
+
+    def wait(self):
+        self._started_event.wait()
 
     @cached_property
     def poller(self):
@@ -89,12 +94,14 @@ class Worker(object):
     def run(self):
         """Process incoming requests."""
         assert self.started, 'worker not started'
+        worker_endpoints = self.app.worker_endpoints
         process = self.process
         poller = self.poller
         notify_socket = self.notify_socket
         poller.register(notify_socket, POLLIN)
         socket = self.socket
         poller.register(socket, POLLIN)
+        worker_endpoints.append(self.worker_endpoint)
 
         def loop():
             """Process incoming requests until all messages are exhausted."""
@@ -112,10 +119,12 @@ class Worker(object):
                     # Receive wake-up message.
                     notify_socket.recv()
 
+        self._started_event.set()
         try:
             while self.started:
                 loop()
         finally:
+            worker_endpoints.remove(self.worker_endpoint)
             poller.unregister(socket)
             poller.unregister(notify_socket)
             socket.close()

@@ -13,18 +13,19 @@ __all__ = ['SinkPool']
 
 cdef class SinkPool(object):
 
-    def __init__(self, object loop, Context context, object frontend,
+    def __init__(self, object loop, Context context, object worker_endpoints,
                  object size):
         self.loop = loop
         self.size = size
         self.pool = deque()
         self.context = context
-        self.frontend = frontend
+        self.worker_endpoints = worker_endpoints
 
     @cython.locals(front_socket=Socket, sink=ZMQSink)
     cdef inline ZMQSink create(self):
         front_socket = self.context.socket(REQ)
-        front_socket.connect(self.frontend)
+        for endpoint in self.worker_endpoints:
+            front_socket.connect(endpoint)
         sink = ZMQSink(self.loop, front_socket)
         return sink
 

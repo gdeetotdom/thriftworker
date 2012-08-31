@@ -22,8 +22,8 @@ class Device(object):
     app = None
 
     def __init__(self, frontend_endpoint=None, backend_endpoint=None):
-        self.frontend_endpoint = frontend_endpoint or self.app.frontend_endpoint
-        self.backend_endpoint = backend_endpoint or self.app.backend_endpoint
+        self.frontend_endpoint = frontend_endpoint
+        self.backend_endpoint = backend_endpoint
         self._started = Event()
         super(Device, self).__init__()
 

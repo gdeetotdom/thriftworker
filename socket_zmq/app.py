@@ -22,8 +22,7 @@ __all__ = ['SocketZMQ']
 class SocketZMQ(SubclassMixin):
     """Factory for socket_zmq."""
 
-    def __init__(self, frontend_endpoint=None, backend_endpoint=None,
-                 loop=None, context=None, protocol_factory=None,
+    def __init__(self, loop=None, context=None, protocol_factory=None,
                  pool_size=None):
         # Set provided instance if we can.
         if loop is not None:
@@ -32,14 +31,9 @@ class SocketZMQ(SubclassMixin):
             self.context = context
         if protocol_factory is not None:
             self.protocol_factory = protocol_factory
-
-        # Use inproc transport by default.
-        self.frontend_endpoint = \
-            frontend_endpoint or 'inproc://front{0}'.format(id(self))
-        self.backend_endpoint = \
-            backend_endpoint or 'inproc://back{0}'.format(id(self))
+        # Worker endpoint list.
+        self.worker_endpoints = []
         self.pool_size = pool_size or POOL_SIZE
-
         super(SocketZMQ, self).__init__()
 
     @cached_property
@@ -73,7 +67,7 @@ class SocketZMQ(SubclassMixin):
     @cached_property
     def sync_pool(self):
         """Instance of :class:`SyncPool`."""
-        return SinkPool(self.loop, self.context, self.frontend_endpoint,
+        return SinkPool(self.loop, self.context, self.worker_endpoints,
                         self.pool_size)
 
     @cached_property
