@@ -5,14 +5,13 @@ from __future__ import absolute_import
 
 from struct import Struct
 import logging
-from threading import Event
 
 from thrift.transport.TTransport import TMemoryBuffer
 from zmq.core.constants import EAGAIN, POLLIN, REP, NOBLOCK, PULL, PUSH
 from zmq.core.context import ZMQError
 
 from .constants import STATUS_FORMAT, DEFAULT_ENV, GEVENT_ENV
-from .utils import cached_property, detect_environment
+from .utils import cached_property, detect_environment, Event
 
 __all__ = ['Worker']
 

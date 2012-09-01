@@ -1,9 +1,7 @@
 """Container for event loop. Prevent loop to exit when no watchers exists."""
 from __future__ import absolute_import
 
-from threading import Event
-
-from .utils import spawn, in_loop
+from .utils import spawn, in_loop, Event
 
 __all__ = ['LoopContainer']
 

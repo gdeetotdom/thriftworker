@@ -8,7 +8,7 @@ from __future__ import absolute_import
 from pyev import default_loop, recommended_backends
 from thrift.protocol import TBinaryProtocol
 
-from .constants import POOL_SIZE
+from .constants import POOL_SIZE, DEFAULT_ENV, GEVENT_ENV
 from .device import Device
 from .listener import Listener
 from .loop import LoopContainer
@@ -50,9 +50,9 @@ class SocketZMQ(SubclassMixin):
     def context(self):
         """Create ZMQ context. Respect environment."""
         env = detect_environment()
-        if env == 'default':
+        if env == DEFAULT_ENV:
             from zmq.core.context import Context
-        elif env == 'gevent':
+        elif env == GEVENT_ENV:
             from zmq.green import Context
         else:
             raise NotImplementedError('Environment "{0}" not supported'

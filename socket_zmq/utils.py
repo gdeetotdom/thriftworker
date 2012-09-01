@@ -10,12 +10,11 @@ from __future__ import absolute_import
 
 import sys
 from functools import wraps
-from threading import Event
 
 from .constants import DEFAULT_ENV, GEVENT_ENV
 
 __all__ = ['cached_property', 'SubclassMixin', 'in_loop', 'spawn',
-           'detect_environment']
+           'detect_environment', 'Event']
 
 _realthread = None
 _environment = None
@@ -114,31 +113,6 @@ class SubclassMixin(object):
         return type(name or Class.__name__, (Class,), attrs)
 
 
-def in_loop(func):
-    """Schedule execution of given function in main event loop. Result of
-    function ignored. Wait for function execution.
-
-    :param func: Given callable.
-
-    """
-
-    @wraps(func)
-    def inner_decorator(self, *args, **kwargs):
-        event = Event()
-
-        def inner_callback(watcher, revents):
-            func(self, *args, **kwargs)
-            async.stop()
-            event.set()
-
-        async = self.loop.async(inner_callback)
-        async.start()
-        async.send()
-        event.wait()
-
-    return inner_decorator
-
-
 def get_realthread():
     """Get the real Python thread module, regardless of any monkeypatching"""
     global _realthread
@@ -184,3 +158,35 @@ def detect_environment():
     if _environment is None:
         _environment = _detect_environment()
     return _environment
+
+
+if detect_environment() == GEVENT_ENV:
+    from gevent.event import Event
+
+else:
+    from threading import Event
+
+
+def in_loop(func):
+    """Schedule execution of given function in main event loop. Result of
+    function ignored. Wait for function execution.
+
+    :param func: Given callable.
+
+    """
+
+    @wraps(func)
+    def inner_decorator(self, *args, **kwargs):
+        event = Event()
+
+        def inner_callback(watcher, revents):
+            func(self, *args, **kwargs)
+            async.stop()
+            event.set()
+
+        async = self.loop.async(inner_callback)
+        async.start()
+        async.send()
+        event.wait()
+
+    return inner_decorator
