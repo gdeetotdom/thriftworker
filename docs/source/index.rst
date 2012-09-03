@@ -3,14 +3,23 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to socket_zmq's documentation!
-======================================
+socket_zmq
+==========
 
-Contents:
+Listen tcp socket, parse Thrift framed protocol and distribute message between
+workers using ZeroMQ.
+
+
+Reference Docs
+==============
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
+   install
+   basic_usage
+   implementation
+   api
 
 
 Indices and tables
