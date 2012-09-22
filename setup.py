@@ -70,12 +70,11 @@ if cython_installed:
         def build_extension(self, ext):
             pass
 
-    cmdclass['cython'] = CythonCommand
-
     class zbuild_ext(build_ext_c):
         def run(self):
             return build_ext.run(self)
 
+    cmdclass['cython'] = CythonCommand
     cmdclass['build_ext'] = zbuild_ext
 
 else:
