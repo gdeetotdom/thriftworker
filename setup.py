@@ -2,8 +2,8 @@ import os
 import re
 import sys
 
-from distutils.core import setup
-from distutils.extension import Extension
+from setuptools import setup, Extension, find_packages
+
 from distutils.command.sdist import sdist
 from distutils.command.build_ext import build_ext
 
@@ -180,8 +180,8 @@ setup(
     license='BSD',
     cmdclass=cmdclass,
     ext_modules=extensions,
-    packages=['socket_zmq'],
-    requires=['pyev_static (>=0.9.0)', 'pyzmq (>=2.2.0)', 'thrift (>=0.8.0)'],
+    packages=find_packages(),
+    install_requires=['pyev_static', 'pyzmq', 'thrift'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
                  "Intended Audience :: System Administrators",
