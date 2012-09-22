@@ -3,9 +3,8 @@ import re
 import sys
 
 from setuptools import setup, Extension, find_packages
-
-from distutils.command.sdist import sdist
-from distutils.command.build_ext import build_ext
+from setuptools.command.sdist import sdist
+from setuptools.command.build_ext import build_ext
 
 
 if sys.version_info < (2, 7):
@@ -72,7 +71,8 @@ if cython_installed:
 
     class zbuild_ext(build_ext_c):
         def run(self):
-            return build_ext.run(self)
+            from distutils.command.build_ext import build_ext as _build_ext
+            return _build_ext.run(self)
 
     cmdclass['cython'] = CythonCommand
     cmdclass['build_ext'] = zbuild_ext
