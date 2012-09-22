@@ -1,5 +1,3 @@
-from zmq.core.socket cimport Socket
-
 from .base cimport BaseSocket
 
 
@@ -15,7 +13,7 @@ cdef enum States:
 cdef class ZMQSink(BaseSocket):
 
     cdef object callback
-    cdef Socket socket
+    cdef object socket
     cdef object struct
     cdef object all_ok
     cdef object request

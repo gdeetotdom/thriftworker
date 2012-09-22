@@ -3,8 +3,8 @@ import cython
 from collections import deque
 
 from zmq.core.constants import REQ
-from zmq.core.context cimport Context
-from zmq.core.socket cimport Socket
+from zmq.core.context import Context
+from zmq.core.socket import Socket
 
 from .sink cimport ZMQSink
 
@@ -13,7 +13,7 @@ __all__ = ['SinkPool']
 
 cdef class SinkPool(object):
 
-    def __init__(self, object loop, Context context, object worker_endpoints,
+    def __init__(self, object loop, object context, object worker_endpoints,
                  object size):
         self.loop = loop
         self.size = size
@@ -21,7 +21,7 @@ cdef class SinkPool(object):
         self.context = context
         self.worker_endpoints = worker_endpoints
 
-    @cython.locals(front_socket=Socket, sink=ZMQSink)
+    @cython.locals(sink=ZMQSink)
     cdef inline ZMQSink create(self):
         front_socket = self.context.socket(REQ)
         for endpoint in self.worker_endpoints:

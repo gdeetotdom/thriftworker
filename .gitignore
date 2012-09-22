@@ -16,6 +16,7 @@ develop-eggs
 MANIFEST
 docs/html/
 docs/source/api/
+socket_zmq/*.c
 
 # Installer logs
 pip-log.txt

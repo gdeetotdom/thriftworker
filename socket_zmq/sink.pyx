@@ -8,7 +8,7 @@ from pyev import EV_ERROR
 from zmq.core.constants import (NOBLOCK, EAGAIN, FD, EVENTS, POLLIN, POLLOUT,
     RCVMORE, SNDMORE)
 from zmq.core.error import ZMQError
-from zmq.core.socket cimport Socket
+from zmq.core.socket import Socket
 
 from .base cimport BaseSocket
 from .constants import STATUS_FORMAT
@@ -20,7 +20,7 @@ logger = getLogger(__name__)
 
 cdef class ZMQSink(BaseSocket):
 
-    def __init__(self, object loop, Socket socket):
+    def __init__(self, object loop, object socket):
         self.all_ok = self.response = self.request = self.name = self.callback = None
         self.struct = Struct(STATUS_FORMAT)
         self.socket = socket

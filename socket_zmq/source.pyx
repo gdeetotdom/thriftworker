@@ -5,9 +5,9 @@ from struct import Struct
 cimport cython
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 from pyev import EV_READ, EV_WRITE, EV_ERROR
-from zmq.utils.buffers cimport frombuffer_2
 
 from .constants import LENGTH_FORMAT, LENGTH_SIZE, BUFFER_SIZE, NONBLOCKING
+from .buffers cimport frombuffer_2
 from .pool cimport SinkPool
 from .base cimport BaseSocket
 from .sink cimport ZMQSink

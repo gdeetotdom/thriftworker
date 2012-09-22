@@ -24,16 +24,6 @@ else:
     cmdclass['build_ext'] = build_ext
 
 
-# try to find zeromq
-try:
-    import zmq
-    zmq_installed = True
-except ImportError:
-    zmq_installed = False
-else:
-    extension_kwargs['include_dirs'] = zmq.get_includes()
-
-
 def source_extension(name):
     extension = '.pyx' if cython_installed else '.c'
     return os.path.join('socket_zmq', name + extension)
@@ -47,10 +37,7 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
     extensions.append(ext)
 
 extensions.append(Extension('socket_zmq.vector_io',
-                            sources=[os.path.join('socket_zmq',
-                                                  'vector_io.c')]))
-
-package_data = {'socket_zmq': ['*.pxd', '*.pyx', '*.c']}
+                            sources=[os.path.join('src', 'vector_io.c')]))
 
 # Description, version and other meta information.
 
@@ -102,7 +89,6 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     packages=['socket_zmq'],
-    package_data=package_data,
     requires=['pyev_static (>=0.9.0)', 'pyzmq (>=2.2.0)', 'thrift (>=0.8.0)'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
