@@ -1,13 +1,20 @@
-from distutils.core import setup
-from distutils.extension import Extension
 import os
 import re
 import sys
+
+from distutils.core import setup
+from distutils.extension import Extension
+from distutils.command.sdist import sdist
+from distutils.command.build_ext import build_ext
 
 
 if sys.version_info < (2, 7):
     raise Exception('ThriftPool requires Python 2.7.')
 
+
+#-----------------------------------------------------------------------------
+# Flags and default values.
+#-----------------------------------------------------------------------------
 
 cmdclass = {}
 extensions = []
@@ -16,13 +23,85 @@ extension_kwargs = {}
 
 # try to find cython
 try:
-    from Cython.Distutils import build_ext
+    from Cython.Distutils import build_ext as build_ext_c
     cython_installed = True
 except ImportError:
     cython_installed = False
-else:
-    cmdclass['build_ext'] = build_ext
 
+
+#-----------------------------------------------------------------------------
+# Commands
+#-----------------------------------------------------------------------------
+
+class CheckSDist(sdist):
+    """Custom sdist that ensures Cython has compiled all pyx files to c."""
+
+    def initialize_options(self):
+        sdist.initialize_options(self)
+        self._pyxfiles = []
+        for root, dirs, files in os.walk('socket_zmq'):
+            for f in files:
+                if f.endswith('.pyx'):
+                    self._pyxfiles.append(os.path.join(root, f))
+
+    def run(self):
+        if 'cython' in cmdclass:
+            self.run_command('cython')
+        else:
+            for pyxfile in self._pyxfiles:
+                cfile = pyxfile[:-3]+'c'
+                msg = "C-source file '%s' not found."%(cfile)+\
+                " Run 'setup.py cython' before sdist."
+                assert os.path.isfile(cfile), msg
+        sdist.run(self)
+
+cmdclass['sdist'] = CheckSDist
+
+
+if cython_installed:
+
+    class CythonCommand(build_ext_c):
+        """Custom distutils command subclassed from Cython.Distutils.build_ext
+        to compile pyx->c, and stop there. All this does is override the
+        C-compile method build_extension() with a no-op."""
+
+        description = "Compile Cython sources to C"
+
+        def build_extension(self, ext):
+            pass
+
+    cmdclass['cython'] = CythonCommand
+
+    class zbuild_ext(build_ext_c):
+        def run(self):
+            return build_ext.run(self)
+
+    cmdclass['build_ext'] = zbuild_ext
+
+else:
+
+    class CheckingBuildExt(build_ext):
+        """Subclass build_ext to get clearer report if Cython is neccessary."""
+
+        def check_cython_extensions(self, extensions):
+            for ext in extensions:
+                for src in ext.sources:
+                    msg = "Cython-generated file '%s' not found." % src
+                    assert os.path.exists(src), msg
+
+        def build_extensions(self):
+            self.check_cython_extensions(self.extensions)
+            self.check_extensions_list(self.extensions)
+
+            for ext in self.extensions:
+                self.build_extension(ext)
+
+    cmdclass['build_ext'] = CheckingBuildExt
+
+
+#-----------------------------------------------------------------------------
+# Extensions
+#-----------------------------------------------------------------------------
 
 def source_extension(name):
     extension = '.pyx' if cython_installed else '.c'
@@ -39,7 +118,10 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
 extensions.append(Extension('socket_zmq.vector_io',
                             sources=[os.path.join('src', 'vector_io.c')]))
 
+
+#-----------------------------------------------------------------------------
 # Description, version and other meta information.
+#-----------------------------------------------------------------------------
 
 re_meta = re.compile(r'__(\w+?)__\s*=\s*(.*)')
 re_vers = re.compile(r'VERSION\s*=\s*\((.*?)\)')
@@ -77,6 +159,10 @@ try:
 finally:
     meta_fh.close()
 
+
+#-----------------------------------------------------------------------------
+# Setup
+#-----------------------------------------------------------------------------
 
 setup(
     name='socket_zmq',
