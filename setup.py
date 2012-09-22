@@ -49,7 +49,7 @@ class CheckSDist(sdist):
             self.run_command('cython')
         else:
             for pyxfile in self._pyxfiles:
-                cfile = pyxfile[:-3]+'c'
+                cfile = pyxfile[:-3] + 'c'
                 msg = "C-source file '%s' not found."%(cfile)+\
                 " Run 'setup.py cython' before sdist."
                 assert os.path.isfile(cfile), msg
@@ -102,16 +102,23 @@ else:
 # Extensions
 #-----------------------------------------------------------------------------
 
+
+suffix = '.pyx' if cython_installed else '.c'
+
+
 def source_extension(name):
-    extension = '.pyx' if cython_installed else '.c'
-    return os.path.join('socket_zmq', name + extension)
+    return os.path.join('socket_zmq', name + suffix)
 
 
 # collect extensions
 for module in ['base', 'sink', 'source', 'pool', 'proxy']:
+    sources = [source_extension(module)]
     ext = Extension('socket_zmq.{0}'.format(module),
-                    sources=[source_extension(module)],
+                    sources=sources,
                     **extension_kwargs)
+    if suffix == '.pyx' and ext.sources[0].endswith('.c'):
+        # undo setuptools stupidly clobbering cython sources:
+        ext.sources = sources
     extensions.append(ext)
 
 extensions.append(Extension('socket_zmq.vector_io',
