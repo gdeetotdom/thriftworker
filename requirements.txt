@@ -1,3 +1,0 @@
-pyzmq>=2.2.0
-https://github.com/blackwithwhite666/pyev/tarball/master#egg=pyev
-thrift
