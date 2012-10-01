@@ -180,13 +180,39 @@ def in_loop(func):
         event = Event()
 
         def inner_callback(watcher, revents):
-            func(self, *args, **kwargs)
-            async.stop()
-            event.set()
+            try:
+                result = func(self, *args, **kwargs)
+            except Exception as result:
+                # Save traceback here.
+                inner_callback.tb = sys.exc_info()[2]
+            finally:
+                async.stop()
+                event.set()
+            inner_callback.result = result
 
         async = self.loop.async(inner_callback)
         async.start()
         async.send()
         event.wait()
 
+        result = inner_callback.result
+        if isinstance(result, Exception):
+            # Restore traceback.
+            raise result.__class__, result, inner_callback.tb
+        else:
+            return result
+
     return inner_decorator
+
+
+def get_port_from_range(name, range_start, range_end):
+    """Get random port from given range [range_start, range_end]."""
+    # Detect port for this service.
+    hashed_port = abs(hash(name) & 0xffff)
+    # Ensure that detected port is in pool.
+    while hashed_port > range_start:
+        hashed_port = hashed_port - range_start
+    # If port is greater than allowed.
+    while range_end < hashed_port + range_start:
+        hashed_port = hashed_port // 2
+    return hashed_port + range_start

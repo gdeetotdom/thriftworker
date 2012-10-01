@@ -1,6 +1,8 @@
 """All constants for this package."""
-from struct import calcsize
+from __future__ import absolute_import
+
 import errno
+from struct import calcsize
 
 
 DEFAULT_ENV = 0x1

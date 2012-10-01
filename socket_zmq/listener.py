@@ -33,7 +33,6 @@ class Listener(object):
         """A shortcut to create a TCP socket and bind it."""
         sock = socket.socket(family=socket.AF_INET)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(self.address)
         sock.setblocking(0)
         return sock
 
@@ -61,6 +60,7 @@ class Listener(object):
     @in_loop
     def start(self):
         """Start underlying proxy."""
+        self.socket.bind(self.address)
         self.proxy.start()
 
     @in_loop

@@ -1,6 +1,8 @@
 """Container for event loop. Prevent loop to exit when no watchers exists."""
 from __future__ import absolute_import
 
+import logging
+
 from .utils import spawn, in_loop, Event
 
 __all__ = ['LoopContainer']
@@ -23,7 +25,10 @@ class LoopContainer(object):
     def _run(self):
         """Run event loop."""
         self._started.set()
-        self.app.loop.start()
+        try:
+            self.app.loop.start()
+        except Exception as exc:
+            logging.exception(exc)
 
     def start(self):
         """Start event loop in separate thread."""

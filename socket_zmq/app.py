@@ -23,7 +23,7 @@ class SocketZMQ(SubclassMixin):
     """Factory for socket_zmq."""
 
     def __init__(self, loop=None, context=None, protocol_factory=None,
-                 pool_size=None):
+                 pool_size=None, port_range=None):
         # Set provided instance if we can.
         if loop is not None:
             self.loop = loop
@@ -34,6 +34,7 @@ class SocketZMQ(SubclassMixin):
         # Worker endpoint list.
         self.worker_endpoints = []
         self.pool_size = pool_size or POOL_SIZE
+        self.port_range = port_range
         super(SocketZMQ, self).__init__()
 
     @cached_property
