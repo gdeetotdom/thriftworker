@@ -23,12 +23,12 @@ class Worker(object):
 
     app = None
 
-    def __init__(self, processors=None):
+    def __init__(self, processors=None, factory=None):
         self.processors = {} if processors is None else processors
         self.notify_endpoint = 'inproc://notify{0}'.format(id(self))
         self.worker_endpoint = 'inproc://worker{0}'.format(id(self))
         self.formatter = Struct(STATUS_FORMAT)
-        self.out_factory = self.in_factory = self.app.protocol_factory
+        self.out_factory = self.in_factory = factory or self.app.protocol_factory
         self.started = False
         self._started_event = Event()
         super(Worker, self).__init__()
@@ -87,6 +87,7 @@ class Worker(object):
 
     def start(self):
         """Run worker."""
+        assert not self.started, 'worker already started'
         self.started = True
         self.run()
 
