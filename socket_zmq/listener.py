@@ -4,9 +4,11 @@
 from __future__ import absolute_import
 
 import socket
+import errno
 
+from .exceptions import BindError
 from .proxy import Proxy
-from .utils import in_loop, cached_property
+from .utils import in_loop, cached_property, get_addresses_from_pool
 
 __all__ = ['Listener']
 
@@ -60,7 +62,21 @@ class Listener(object):
     @in_loop
     def start(self):
         """Start underlying proxy."""
-        self.socket.bind(self.address)
+        binded = False
+        for address in get_addresses_from_pool(self.name, self.address,
+                                               self.app.port_range):
+            try:
+                self.socket.bind(address)
+            except IOError as exc:
+                if exc.errno == errno.EADDRINUSE:
+                    continue
+                raise
+            else:
+                binded = True
+                break
+        if not binded:
+            raise BindError("Service {0!r} can't bind to address {1!r}".
+                            format(self.name, self.address))
         self.proxy.start()
 
     @in_loop
