@@ -168,42 +168,59 @@ else:
     from threading import Event
 
 
-def in_loop(func):
-    """Schedule execution of given function in main event loop. Result of
-    function ignored. Wait for function execution.
-
-    :param func: Given callable.
+class in_loop(object):
+    """Schedule execution of given function in main event loop. Wait for
+    function execution.
 
     """
 
-    @wraps(func)
-    def inner_decorator(self, *args, **kwargs):
-        event = Event()
+    def __init__(self, func=None):
+        self.__func = func
+        self.__name__ = func.__name__
+        self.__doc__ = func.__doc__
 
-        def inner_callback(watcher, revents):
-            try:
-                result = func(self, *args, **kwargs)
-            except Exception as result:
-                # Save traceback here.
-                inner_callback.tb = sys.exc_info()[2]
-            finally:
-                async.stop()
-                event.set()
-            inner_callback.result = result
+    def __create(self, obj):
+        method = self.__func.__get__(obj)
 
-        async = self.loop.async(inner_callback)
-        async.start()
-        async.send()
-        event.wait()
+        @wraps(self.__func)
+        def inner_decorator(*args, **kwargs):
+            event = Event()
+            d = {'result': None, 'tb': None}
 
-        result = inner_callback.result
-        if isinstance(result, Exception):
-            # Restore traceback.
-            raise result.__class__, result, inner_callback.tb
-        else:
-            return result
+            def inner_callback(watcher, revents):
+                try:
+                    d['result'] = method(*args, **kwargs)
+                except Exception as exc:
+                    # Save traceback here.
+                    d['result'] = exc
+                    d['tb'] = sys.exc_info()[2]
+                finally:
+                    async.stop()
+                    event.set()
 
-    return inner_decorator
+            async = obj.loop.async(inner_callback)
+            async.start()
+            async.send()
+            event.wait()
+            event.clear()
+
+            result, tb = d['result'], d['tb']
+            if isinstance(result, Exception):
+                # Restore traceback.
+                raise result.__class__, result, tb
+            else:
+                return result
+
+        return inner_decorator
+
+    def __get__(self, obj, type=None):
+        if obj is None:
+            return self
+        try:
+            return obj.__dict__[self.__name__]
+        except KeyError:
+            value = obj.__dict__[self.__name__] = self.__create(obj)
+            return value
 
 
 def get_port_from_range(name, range_start, range_end):
