@@ -149,14 +149,11 @@ cdef class SocketSource:
             # it was a oneway request, do not write answer
             self.status = WAIT_LEN
         else:
-            # Create buffer for message.
-            view = memoryview(bytearray(message_length + LENGTH_SIZE))
             # Create message.
-            view[:LENGTH_SIZE] = self.struct.pack(message_length)
-            view[LENGTH_SIZE:] = message
+            data = self.struct.pack(message_length) + message
             self.status = SEND_ANSWER
             # Write data.
-            self.client.write(view, self.cb_write_done)
+            self.client.write(data, self.cb_write_done)
 
     cdef inline void handle_error(self, object error):
         logger.error('Error with client %r, service %r: %s',
