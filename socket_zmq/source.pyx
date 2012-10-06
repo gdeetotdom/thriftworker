@@ -180,11 +180,9 @@ cdef class SocketSource:
 
             if self.sink.is_ready():
                 # Message is ready to transfer to sink.
-                message_buffer = self.message_buffer
-                self.sink.ready(self.name, self.ready, message_buffer.getvalue())
+                self.sink.ready(self.name, self.ready, self.message_buffer.getvalue())
                 # Reset message buffer.
-                message_buffer.truncate()
-                message_buffer.seek(0)
+                self.message_buffer = BytesIO()
             else:
                 # Socket was closed while we wait for sink reply.
                 self.close()

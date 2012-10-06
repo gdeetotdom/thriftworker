@@ -11,6 +11,7 @@ cdef enum States:
 
 cdef class ZMQSink:
 
+    cdef object write_started
     cdef object callback
     cdef object struct
     cdef object all_ok
@@ -27,8 +28,8 @@ cdef class ZMQSink:
     cdef inline bint is_ready(self)
     cpdef is_closed(self)
 
-    cdef inline void start_write_watcher(self)
-    cdef inline void stop_write_watcher(self)
+    cdef inline void start_write(self)
+    cdef inline void stop_write(self)
 
     cdef inline read(self)
     cdef inline write(self)

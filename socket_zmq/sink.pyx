@@ -22,6 +22,7 @@ cdef class ZMQSink:
 
     def __init__(self, object loop, object socket):
         # Default values.
+        self.write_started = False
         self.response = self.request = self.name = self.callback = None
         self.all_ok = True
         self.struct = Struct(STATUS_FORMAT)
@@ -50,33 +51,42 @@ cdef class ZMQSink:
     cpdef is_closed(self):
         return self.status == CLOSED
 
-    cdef inline void start_write_watcher(self):
+    cdef inline void start_write(self):
         self.poller.start(UV_READABLE | UV_WRITABLE, self.cb_event)
+        self.write_started = True
 
-    cdef inline void stop_write_watcher(self):
-        self.poller.start(UV_READABLE, self.cb_event)
+    cdef inline void stop_write(self):
+        if self.write_started:
+            self.poller.start(UV_READABLE, self.cb_event)
 
     cdef inline read(self):
         assert self.is_readable(), 'sink not readable'
+        socket = self.socket
+
         if self.status == READ_STATUS:
-            self.all_ok = self.struct.unpack(self.socket.recv(NOBLOCK))[0]
+            self.all_ok = self.struct.unpack(socket.recv(NOBLOCK))[0]
             self.status = READ_REPLY
 
         if self.status == READ_REPLY:
             assert self.socket.getsockopt(RCVMORE), 'reply truncated'
-            self.response = self.socket.recv(NOBLOCK)
+            self.response = socket.recv(NOBLOCK)
             self.status = WAIT_MESSAGE
 
     cdef inline write(self):
         assert self.is_writeable(), 'sink not writable'
+        socket = self.socket
+
         if self.status == SEND_NAME:
-            self.socket.send(self.name, NOBLOCK | SNDMORE)
+            socket.send(self.name, NOBLOCK | SNDMORE)
+            self.name = None
             self.status = SEND_REQUEST
 
         if self.status == SEND_REQUEST:
-            self.socket.send(self.request, NOBLOCK)
+            socket.send(self.request, NOBLOCK)
             self.request = None
             self.status = READ_STATUS
+
+        self.stop_write()
 
     @cython.locals(ready=cython.bint)
     cpdef close(self):
@@ -96,7 +106,7 @@ cdef class ZMQSink:
         # Try to write received message.
         self.on_writable()
         if self.is_writeable():
-            self.start_write_watcher()
+            self.start_write()
 
     cdef inline on_readable(self):
         try:
@@ -116,7 +126,6 @@ cdef class ZMQSink:
         try:
             while self.is_writeable():
                 self.write()
-            self.stop_write_watcher()
 
         except ZMQError, exc:
             if exc.errno != EAGAIN:
