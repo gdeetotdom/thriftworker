@@ -3,9 +3,11 @@
 """
 from __future__ import absolute_import
 
+import logging
+
 from pyuv import TCP
 from pyuv.error import TCPError
-from pyuv.errno import UV_EADDRINUSE
+from pyuv.errno import UV_EADDRINUSE, strerror
 
 from .constants import BACKLOG_SIZE
 from .exceptions import BindError
@@ -13,6 +15,8 @@ from .source import SocketSource
 from .utils import in_loop, cached_property, get_addresses_from_pool
 
 __all__ = ['Listener']
+
+logger = logging.getLogger(__name__)
 
 
 class Listener(object):
@@ -76,6 +80,10 @@ class Listener(object):
                 pass
 
         def on_connection(handle, error):
+            if error:
+                logger.error('Error handling new connection for service %r: %s',
+                             name, strerror(error))
+                return
             client = socket_factory()
             client.nodelay(True)
             server_socket.accept(client)

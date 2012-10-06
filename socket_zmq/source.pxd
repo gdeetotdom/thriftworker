@@ -24,6 +24,7 @@ cdef class SocketSource:
     cdef object name
     cdef SinkPool pool
     cdef object client
+    cdef object peername
     cdef object loop
     cdef object on_close
 
@@ -38,5 +39,6 @@ cdef class SocketSource:
     cpdef ready(self, object all_ok, object message)
     cpdef close(self)
 
+    cdef inline void handle_error(self, object error)
     cpdef cb_read_done(self, object handle, object data, object error)
     cpdef cb_write_done(self, object handle, object error)

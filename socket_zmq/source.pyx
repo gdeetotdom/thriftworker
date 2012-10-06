@@ -4,7 +4,7 @@ from io import BytesIO
 
 cimport cython
 
-from pyuv.errno import strerror
+from pyuv.errno import strerror, UV_EOF
 
 from .constants import LENGTH_FORMAT, LENGTH_SIZE, BUFFER_SIZE, NONBLOCKING
 from .pool cimport SinkPool
@@ -48,6 +48,7 @@ cdef class SocketSource:
         self.sink = self.pool.get()
 
         # Start watchers.
+        self.peername = '{0[0]}:{0[1]}'.format(self.client.getpeername())
         self.client.start_read(self.cb_read_done)
 
     @cython.profile(False)
@@ -157,14 +158,18 @@ cdef class SocketSource:
             # Write data.
             self.client.write(view, self.cb_write_done)
 
+    cdef inline void handle_error(self, object error):
+        logger.error('Error with client %r, service %r: %s',
+                     self.peername, self.name, strerror(error))
+
     cpdef cb_read_done(self, object handle, object data, object error):
-        if error is not None:
-            logger.error(strerror(error))
+        if error and error != UV_EOF:
+            self.handle_error(error)
             self.close()
             return
 
         try:
-            self.incoming_buffer = data
+            self.incoming_buffer = data or ''
             while self.is_readable():
                 # Try to read whole message to buffer while we can.
                 self.read()
@@ -190,8 +195,9 @@ cdef class SocketSource:
 
     cpdef cb_write_done(self, object handle, object error):
         assert self.is_writeable(), 'socket in non writable state'
-        if error is not None:
-            logger.error(strerror(error))
+
+        if error:
+            self.handle_error(error)
             self.close()
             return
 

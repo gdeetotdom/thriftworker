@@ -108,7 +108,7 @@ cdef class ZMQSink:
                 raise
 
         else:
-            if self.is_ready():
+            if self.is_ready() and self.callback is not None:
                 self.callback(self.all_ok, self.response)
                 self.all_ok = self.response = self.callback = None
 
