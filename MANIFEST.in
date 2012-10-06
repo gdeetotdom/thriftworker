@@ -8,7 +8,6 @@ prune docs/build
 prune docs/html
 
 graft socket_zmq
-graft src
 
 global-exclude *.so
 global-exclude *.pyd

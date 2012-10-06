@@ -1,6 +1,6 @@
 """Proxy from thrift framed transport to zmq."""
 
-VERSION = (0, 1, 3)
+VERSION = (0, 1, 5)
 
 __version__ = '.'.join(map(str, VERSION[0:3]))
 __author__ = 'Lipin Dmitriy'

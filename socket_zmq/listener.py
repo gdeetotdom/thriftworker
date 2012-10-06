@@ -3,11 +3,13 @@
 """
 from __future__ import absolute_import
 
-import socket
-import errno
+from pyuv import TCP
+from pyuv.error import TCPError
+from pyuv.errno import UV_EADDRINUSE
 
+from .constants import BACKLOG_SIZE
 from .exceptions import BindError
-from .proxy import Proxy
+from .source import SocketSource
 from .utils import in_loop, cached_property, get_addresses_from_pool
 
 __all__ = ['Listener']
@@ -27,16 +29,17 @@ class Listener(object):
 
         """
         self.name = name
+        self.connections = set()
         self.address = address
-        self.backlog = backlog
+        self.backlog = backlog or BACKLOG_SIZE
+
+    def create_socket(self):
+        return TCP(self.loop)
 
     @cached_property
     def socket(self):
         """A shortcut to create a TCP socket and bind it."""
-        sock = socket.socket(family=socket.AF_INET)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setblocking(0)
-        return sock
+        return self.create_socket()
 
     @property
     def host(self):
@@ -53,22 +56,45 @@ class Listener(object):
         """Shortcut to loop."""
         return self.app.loop
 
-    @cached_property
-    def proxy(self):
-        """Create new proxy with given parameters."""
-        return Proxy(self.loop, self.name, self.socket, self.app.sync_pool,
-                     self.backlog)
+    @property
+    def addresses(self):
+        return get_addresses_from_pool(self.name, self.address,
+                                       self.app.port_range)
+
+    def create_acceptor(self):
+        name = self.name
+        pool = self.app.sync_pool
+        loop = self.loop
+        server_socket = self.socket
+        socket_factory = self.create_socket
+        connections = self.connections
+
+        def on_close(source):
+            try:
+                connections.remove(source)
+            except KeyError:
+                pass
+
+        def on_connection(handle, error):
+            client = socket_factory()
+            client.nodelay(True)
+            server_socket.accept(client)
+            connections.add(SocketSource(name, pool, loop, client, on_close))
+
+        return on_connection
 
     @in_loop
     def start(self):
-        """Start underlying proxy."""
         binded = False
-        for address in get_addresses_from_pool(self.name, self.address,
-                                               self.app.port_range):
+        socket = self.socket
+        acceptor = self.create_acceptor()
+        backlog = self.backlog
+        for address in self.addresses:
             try:
-                self.socket.bind(address)
-            except IOError as exc:
-                if exc.errno == errno.EADDRINUSE:
+                socket.bind(address)
+                socket.listen(acceptor, backlog)
+            except TCPError as exc:
+                if exc.args[0] == UV_EADDRINUSE:
                     continue
                 raise
             else:
@@ -77,9 +103,11 @@ class Listener(object):
         if not binded:
             raise BindError("Service {0!r} can't bind to address {1!r}".
                             format(self.name, self.address))
-        self.proxy.start()
 
     @in_loop
     def stop(self):
-        """Stop underlying proxy."""
-        self.proxy.stop()
+        self.socket.close()
+        while self.connections:
+            connection = self.connections.pop()
+            if not connection.is_closed():
+                connection.close()

@@ -1,4 +1,3 @@
-from .base cimport BaseSocket
 
 
 cdef enum States:
@@ -10,10 +9,9 @@ cdef enum States:
     CLOSED = 6
 
 
-cdef class ZMQSink(BaseSocket):
+cdef class ZMQSink:
 
     cdef object callback
-    cdef object socket
     cdef object struct
     cdef object all_ok
     cdef object request
@@ -21,10 +19,16 @@ cdef class ZMQSink(BaseSocket):
     cdef object name
     cdef States status
 
+    cdef object socket
+    cdef object poller
+
     cdef inline bint is_writeable(self)
     cdef inline bint is_readable(self)
     cdef inline bint is_ready(self)
     cpdef is_closed(self)
+
+    cdef inline void start_write_watcher(self)
+    cdef inline void stop_write_watcher(self)
 
     cdef inline read(self)
     cdef inline write(self)
@@ -35,5 +39,4 @@ cdef class ZMQSink(BaseSocket):
     cdef inline on_readable(self)
     cdef inline on_writable(self)
 
-    cpdef cb_readable(self, object watcher, object revents)
-    cpdef cb_writable(self, object watcher, object revents)
+    cpdef cb_event(self, object poll_handle, object events, object errorno)

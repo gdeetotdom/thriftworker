@@ -3,7 +3,9 @@ from __future__ import absolute_import
 
 import logging
 
-from .utils import spawn, in_loop, Event
+from pyuv import Async
+
+from .utils import spawn, Event
 
 __all__ = ['LoopContainer']
 
@@ -26,24 +28,17 @@ class LoopContainer(object):
         """Run event loop."""
         self._started.set()
         try:
-            self.app.loop.start()
+            self.app.loop.run()
         except Exception as exc:
             logging.exception(exc)
 
     def start(self):
         """Start event loop in separate thread."""
-        watcher = self._guard_watcher = self.loop.async(lambda *args: None)
-        watcher.start()
+        self._guard_watcher = Async(self.loop, lambda *args: None)
         spawn(self._run)
         self._started.wait()
-
-    @in_loop
-    def _shutdown(self):
-        """Shutdown event loop."""
-        self._guard_watcher.stop()
-        self.loop.stop()
 
     def stop(self):
         """Stop event loop and wait until it exit."""
         assert self._guard_watcher is not None, 'loop not started'
-        self._shutdown()
+        self._guard_watcher.close()

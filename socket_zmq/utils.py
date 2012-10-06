@@ -12,6 +12,8 @@ import sys
 import itertools
 from functools import wraps
 
+from pyuv import Async
+
 from .constants import DEFAULT_ENV, GEVENT_ENV
 
 __all__ = ['cached_property', 'SubclassMixin', 'in_loop', 'spawn',
@@ -19,6 +21,35 @@ __all__ = ['cached_property', 'SubclassMixin', 'in_loop', 'spawn',
 
 _realthread = None
 _environment = None
+
+
+def _detect_environment():
+
+    # -gevent-
+    if 'gevent' in sys.modules:
+        try:
+            from gevent import socket as _gsocket
+            import socket
+
+            if socket.socket is _gsocket.socket:
+                return GEVENT_ENV
+        except ImportError:
+            pass
+
+    return DEFAULT_ENV
+
+
+def detect_environment():
+    global _environment
+    if _environment is None:
+        _environment = _detect_environment()
+    return _environment
+
+
+if detect_environment() == GEVENT_ENV:
+    from gevent.event import Event
+else:
+    from threading import Event
 
 
 class cached_property(object):
@@ -138,36 +169,6 @@ def spawn(func, *args, **kwargs):
     return get_realthread().start_new_thread(func, args, kwargs)
 
 
-def _detect_environment():
-
-    # -gevent-
-    if 'gevent' in sys.modules:
-        try:
-            from gevent import socket as _gsocket
-            import socket
-
-            if socket.socket is _gsocket.socket:
-                return GEVENT_ENV
-        except ImportError:
-            pass
-
-    return DEFAULT_ENV
-
-
-def detect_environment():
-    global _environment
-    if _environment is None:
-        _environment = _detect_environment()
-    return _environment
-
-
-if detect_environment() == GEVENT_ENV:
-    from gevent.event import Event
-
-else:
-    from threading import Event
-
-
 class in_loop(object):
     """Schedule execution of given function in main event loop. Wait for
     function execution.
@@ -187,7 +188,7 @@ class in_loop(object):
             event = Event()
             d = {'result': None, 'tb': None}
 
-            def inner_callback(watcher, revents):
+            def inner_callback(async_handle):
                 try:
                     d['result'] = method(*args, **kwargs)
                 except Exception as exc:
@@ -195,11 +196,10 @@ class in_loop(object):
                     d['result'] = exc
                     d['tb'] = sys.exc_info()[2]
                 finally:
-                    async.stop()
+                    async.close()
                     event.set()
 
-            async = obj.loop.async(inner_callback)
-            async.start()
+            async = Async(obj.loop, inner_callback)
             async.send()
             event.wait()
             event.clear()

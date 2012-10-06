@@ -111,7 +111,7 @@ def source_extension(name):
 
 
 # collect extensions
-for module in ['base', 'sink', 'source', 'pool', 'proxy']:
+for module in ['sink', 'source', 'pool']:
     sources = [source_extension(module)]
     ext = Extension('socket_zmq.{0}'.format(module),
                     sources=sources,
@@ -120,9 +120,6 @@ for module in ['base', 'sink', 'source', 'pool', 'proxy']:
         # undo setuptools stupidly clobbering cython sources:
         ext.sources = sources
     extensions.append(ext)
-
-extensions.append(Extension('socket_zmq.vector_io',
-                            sources=[os.path.join('src', 'vector_io.c')]))
 
 
 #-----------------------------------------------------------------------------
@@ -181,7 +178,7 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     packages=find_packages(),
-    install_requires=['pyev_static', 'pyzmq', 'thrift'],
+    install_requires=['pyuv', 'pyzmq', 'thrift'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
                  "Intended Audience :: System Administrators",

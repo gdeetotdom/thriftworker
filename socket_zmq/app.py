@@ -5,7 +5,7 @@ Distribute thrift requests between workers.
 """
 from __future__ import absolute_import
 
-from pyev import default_loop, recommended_backends
+from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
 from .constants import POOL_SIZE, DEFAULT_ENV, GEVENT_ENV
@@ -40,7 +40,7 @@ class SocketZMQ(SubclassMixin):
     @cached_property
     def loop(self):
         """Create event loop. Should be running in separate thread."""
-        return default_loop(flags=recommended_backends())
+        return Loop()
 
     @cached_property
     def loop_container(self):

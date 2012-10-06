@@ -3,14 +3,14 @@ from logging import getLogger
 from struct import Struct
 
 cimport cython
-from cpython cimport bool
-from pyev import EV_ERROR
+
+from pyuv import Poll, UV_READABLE, UV_WRITABLE
+
 from zmq.core.constants import (NOBLOCK, EAGAIN, FD, EVENTS, POLLIN, POLLOUT,
     RCVMORE, SNDMORE)
 from zmq.core.error import ZMQError
 from zmq.core.socket import Socket
 
-from .base cimport BaseSocket
 from .constants import STATUS_FORMAT
 
 __all__ = ['ZMQSink']
@@ -18,15 +18,21 @@ __all__ = ['ZMQSink']
 logger = getLogger(__name__)
 
 
-cdef class ZMQSink(BaseSocket):
+cdef class ZMQSink:
 
     def __init__(self, object loop, object socket):
-        self.all_ok = self.response = self.request = self.name = self.callback = None
+        # Default values.
+        self.response = self.request = self.name = self.callback = None
+        self.all_ok = True
         self.struct = Struct(STATUS_FORMAT)
-        self.socket = socket
         self.status = WAIT_MESSAGE
-        BaseSocket.__init__(self, loop, self.socket.getsockopt(FD))
-        self.start_read_watcher()
+
+        # Given arguments.
+        self.socket = socket
+
+        # Create and start poller.
+        poller = self.poller = Poll(loop, socket.getsockopt(FD))
+        poller.start(UV_READABLE, self.cb_event)
 
     @cython.profile(False)
     cdef inline bint is_writeable(self):
@@ -43,6 +49,12 @@ cdef class ZMQSink(BaseSocket):
     @cython.profile(False)
     cpdef is_closed(self):
         return self.status == CLOSED
+
+    cdef inline void start_write_watcher(self):
+        self.poller.start(UV_READABLE | UV_WRITABLE, self.cb_event)
+
+    cdef inline void stop_write_watcher(self):
+        self.poller.start(UV_READABLE, self.cb_event)
 
     cdef inline read(self):
         assert self.is_readable(), 'sink not readable'
@@ -70,9 +82,9 @@ cdef class ZMQSink(BaseSocket):
     cpdef close(self):
         assert not self.is_closed(), 'sink already closed'
         self.status = CLOSED
+        self.poller.close()
         self.socket.close()
-        self.all_ok = self.response = self.request = self.name = self.callback = None
-        BaseSocket.close(self)
+        self.response = self.request = self.name = self.callback = None
 
     cpdef ready(self, object name, object callback, object request):
         assert self.is_ready(), 'sink not ready'
@@ -114,16 +126,12 @@ cdef class ZMQSink(BaseSocket):
             if self.is_readable():
                 self.on_readable()
 
-    cpdef cb_readable(self, object watcher, object revents):
+    cpdef cb_event(self, object poll_handle, object events, object errorno):
         try:
-            self.on_readable()
-        except Exception as exc:
-            logger.exception(exc)
-            self.close()
-
-    cpdef cb_writable(self, object watcher, object revents):
-        try:
-            self.on_writable()
+            if events & UV_READABLE:
+                self.on_readable()
+            elif events & UV_WRITABLE:
+                self.on_writable()
         except Exception as exc:
             logger.exception(exc)
             self.close()
