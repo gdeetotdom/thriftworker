@@ -150,7 +150,8 @@ cdef class SocketSource:
             self.status = WAIT_LEN
         else:
             # Create message.
-            data = self.struct.pack(message_length) + message
+            data = self.struct.pack(message_length)
+            data += message
             self.status = SEND_ANSWER
             # Write data.
             self.client.write(data, self.cb_write_done)
