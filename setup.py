@@ -111,7 +111,7 @@ def source_extension(name):
 
 
 # collect extensions
-for module in ['sink', 'source', 'pool']:
+for module in ['connection']:
     sources = [source_extension(module)]
     ext = Extension('socket_zmq.{0}'.format(module),
                     sources=sources,
@@ -178,7 +178,7 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     packages=find_packages(),
-    install_requires=['pyuv', 'pyzmq', 'thrift'],
+    install_requires=['pyuv', 'thrift'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
                  "Intended Audience :: System Administrators",

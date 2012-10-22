@@ -1,16 +1,15 @@
-from .pool cimport SinkPool
-from .sink cimport ZMQSink
 
 
 cdef enum States:
     WAIT_LEN = 0
     WAIT_MESSAGE = 1
     WAIT_PROCESS = 2
-    SEND_ANSWER = 3
-    CLOSED = 4
+    WAIT_ANSWER = 3
+    SEND_ANSWER = 4
+    CLOSED = 5
 
 
-cdef class SocketSource:
+cdef class Connection:
 
     # Default values.
     cdef object message_length
@@ -21,18 +20,16 @@ cdef class SocketSource:
     cdef object incoming_buffer
 
     # Given arguments.
-    cdef object name
-    cdef SinkPool pool
+    cdef object producer
     cdef object client
     cdef object peername
     cdef object loop
     cdef object on_close
 
-    cdef ZMQSink sink
-
     cdef inline bint is_writeable(self)
     cdef inline bint is_readable(self)
     cdef inline bint is_ready(self)
+    cpdef is_waiting(self)
     cpdef is_closed(self)
 
     cdef inline read(self)

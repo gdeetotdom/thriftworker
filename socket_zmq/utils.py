@@ -17,7 +17,7 @@ from pyuv import Async
 from .constants import DEFAULT_ENV, GEVENT_ENV
 
 __all__ = ['cached_property', 'SubclassMixin', 'in_loop', 'spawn',
-           'detect_environment', 'Event']
+           'detect_environment', 'Event', 'LoopMixin']
 
 _realthread = None
 _environment = None
@@ -175,10 +175,11 @@ class in_loop(object):
 
     """
 
-    def __init__(self, func=None):
+    def __init__(self, func=None, timeout=None):
         self.__func = func
         self.__name__ = func.__name__
         self.__doc__ = func.__doc__
+        self.__timeout = timeout or 5.0
 
     def __create(self, obj):
         method = self.__func.__get__(obj)
@@ -189,6 +190,7 @@ class in_loop(object):
             d = {'result': None, 'tb': None}
 
             def inner_callback(async_handle):
+                async.close()
                 try:
                     d['result'] = method(*args, **kwargs)
                 except Exception as exc:
@@ -196,13 +198,18 @@ class in_loop(object):
                     d['result'] = exc
                     d['tb'] = sys.exc_info()[2]
                 finally:
-                    async.close()
                     event.set()
 
             async = Async(obj.loop, inner_callback)
             async.send()
-            event.wait()
-            event.clear()
+            try:
+                if not event.wait(self.__timeout):
+                    raise Exception('Timeout happened when calling method'
+                                    ' {0!r} of {1!r}'.format(self.__name__, obj))
+            finally:
+                event.clear()
+                if not async.closed:
+                    async.close()
 
             result, tb = d['result'], d['tb']
             if isinstance(result, Exception):

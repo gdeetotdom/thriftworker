@@ -8,13 +8,12 @@ from __future__ import absolute_import
 from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
-from .constants import POOL_SIZE, DEFAULT_ENV, GEVENT_ENV
-from .device import Device
+from .collector import Collector
 from .listener import Listener
 from .loop import LoopContainer
-from .pool import SinkPool
 from .worker import Worker
-from .utils import cached_property, SubclassMixin, detect_environment
+from .ventilator import Ventilator
+from .utils import cached_property, SubclassMixin
 
 __all__ = ['SocketZMQ']
 
@@ -31,9 +30,6 @@ class SocketZMQ(SubclassMixin):
             self.context = context
         if protocol_factory is not None:
             self.protocol_factory = protocol_factory
-        # Worker endpoint list.
-        self.worker_endpoints = []
-        self.pool_size = pool_size or POOL_SIZE
         self.port_range = port_range
         super(SocketZMQ, self).__init__()
 
@@ -43,22 +39,14 @@ class SocketZMQ(SubclassMixin):
         return Loop()
 
     @cached_property
+    def LoopContainer(self):
+        """Create bounded :class:`LoopContainer` class."""
+        return self.subclass_with_self(LoopContainer)
+
+    @cached_property
     def loop_container(self):
         """Instance of bounded :class:`LoopContainer`."""
         return self.LoopContainer()
-
-    @cached_property
-    def context(self):
-        """Create ZMQ context. Respect environment."""
-        env = detect_environment()
-        if env == DEFAULT_ENV:
-            from zmq.core.context import Context
-        elif env == GEVENT_ENV:
-            from zmq.green import Context
-        else:
-            raise NotImplementedError('Environment "{0}" not supported'
-                                      .format(env))
-        return Context.instance()
 
     @cached_property
     def protocol_factory(self):
@@ -66,30 +54,29 @@ class SocketZMQ(SubclassMixin):
         return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
     @cached_property
-    def sync_pool(self):
-        """Instance of :class:`SyncPool`."""
-        return SinkPool(self.loop, self.context, self.worker_endpoints,
-                        self.pool_size)
+    def Ventilator(self):
+        """Create bounded :class:`Ventilator` class."""
+        return self.subclass_with_self(Ventilator)
 
     @cached_property
-    def device(self):
-        """Instance of bounded :class:`Device`."""
-        return self.Device()
+    def ventilator(self):
+        """Create new ventilator."""
+        return self.Ventilator()
 
     @cached_property
-    def LoopContainer(self):
-        """Create bounded :class:`LoopContainer` class."""
-        return self.subclass_with_self(LoopContainer)
+    def Collector(self):
+        """Create bounded :class:`Collector` class."""
+        return self.subclass_with_self(Collector)
+
+    @cached_property
+    def collector(self):
+        """Create bounded :class:`Collector` class."""
+        return self.Collector()
 
     @cached_property
     def Listener(self):
         """Create bounded :class:`Listener` class."""
         return self.subclass_with_self(Listener)
-
-    @cached_property
-    def Device(self):
-        """Create bounded :class:`Device` class."""
-        return self.subclass_with_self(Device)
 
     @cached_property
     def Worker(self):

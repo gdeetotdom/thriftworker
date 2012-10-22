@@ -11,15 +11,16 @@ from pyuv.errno import UV_EADDRINUSE, strerror
 
 from .constants import BACKLOG_SIZE
 from .exceptions import BindError
-from .source import SocketSource
+from .connection import Connection
 from .utils import in_loop, cached_property, get_addresses_from_pool
+from .mixin import LoopMixin
 
 __all__ = ['Listener']
 
 logger = logging.getLogger(__name__)
 
 
-class Listener(object):
+class Listener(LoopMixin):
     """Facade for proxy. Support lazy initialization."""
 
     app = None
@@ -33,7 +34,6 @@ class Listener(object):
 
         """
         self.name = name
-        self.connections = set()
         self.address = address
         self.backlog = backlog or BACKLOG_SIZE
 
@@ -55,39 +55,27 @@ class Listener(object):
         """Return binded port number."""
         return self.socket.getsockname()[1]
 
-    @property
-    def loop(self):
-        """Shortcut to loop."""
-        return self.app.loop
-
-    @property
-    def addresses(self):
-        return get_addresses_from_pool(self.name, self.address,
-                                       self.app.port_range)
-
-    def create_acceptor(self):
-        name = self.name
-        pool = self.app.sync_pool
+    def _create_acceptor(self):
+        service = self.name
         loop = self.loop
+        collector = self.app.collector
+        producer = self.app.ventilator.create_producer(service)
         server_socket = self.socket
         socket_factory = self.create_socket
-        connections = self.connections
 
-        def on_close(source):
-            try:
-                connections.remove(source)
-            except KeyError:
-                pass
+        def on_close(connection):
+            collector.remove(connection)
 
         def on_connection(handle, error):
             if error:
                 logger.error('Error handling new connection for service %r: %s',
-                             name, strerror(error))
+                             service, strerror(error))
                 return
             client = socket_factory()
             client.nodelay(True)
             server_socket.accept(client)
-            connections.add(SocketSource(name, pool, loop, client, on_close))
+            connection = Connection(producer, loop, client, on_close)
+            collector.register(connection)
 
         return on_connection
 
@@ -95,9 +83,11 @@ class Listener(object):
     def start(self):
         binded = False
         socket = self.socket
-        acceptor = self.create_acceptor()
+        acceptor = self._create_acceptor()
         backlog = self.backlog
-        for address in self.addresses:
+        addresses = get_addresses_from_pool(self.name, self.address,
+                                            self.app.port_range)
+        for address in addresses:
             try:
                 socket.bind(address)
                 socket.listen(acceptor, backlog)
@@ -115,7 +105,3 @@ class Listener(object):
     @in_loop
     def stop(self):
         self.socket.close()
-        while self.connections:
-            connection = self.connections.pop()
-            if not connection.is_closed():
-                connection.close()

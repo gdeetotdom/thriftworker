@@ -6,16 +6,14 @@ cimport cython
 
 from pyuv.errno import strerror, UV_EOF
 
-from .constants import LENGTH_FORMAT, LENGTH_SIZE, BUFFER_SIZE, NONBLOCKING
-from .pool cimport SinkPool
-from .sink cimport ZMQSink
+from .constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
 
-__all__ = ['SocketSource']
+__all__ = ['Connection']
 
 logger = getLogger(__name__)
 
 
-cdef class SocketSource:
+cdef class Connection:
     """Basic class is represented connection.
 
     It can be in state:
@@ -29,7 +27,7 @@ cdef class SocketSource:
 
     """
 
-    def __init__(self, object name, SinkPool pool, object loop, object client,
+    def __init__(self, object producer, object loop, object client,
                  object on_close):
         # Default values.
         self.recv_bytes = self.message_length = 0
@@ -39,13 +37,10 @@ cdef class SocketSource:
         self.incoming_buffer = None
 
         # Given arguments.
-        self.name = name
-        self.pool = pool
+        self.producer = producer
         self.loop = loop
         self.client = client
         self.on_close = on_close
-
-        self.sink = self.pool.get()
 
         # Start watchers.
         self.peername = '{0[0]}:{0[1]}'.format(self.client.getpeername())
@@ -65,6 +60,11 @@ cdef class SocketSource:
     cdef inline bint is_ready(self):
         """Returns ``True`` if source is ready."""
         return self.status == WAIT_PROCESS
+
+    @cython.profile(False)
+    cpdef is_waiting(self):
+        """Returns ``True`` if source is waiting for answer."""
+        return self.status == WAIT_ANSWER
 
     @cython.profile(False)
     cpdef is_closed(self):
@@ -113,20 +113,10 @@ cdef class SocketSource:
         self.status = CLOSED
         self.client.close()
 
-        # Close sink if needed.
-        if self.sink.is_ready():
-            # Sink is ready, return to pool.
-            self.pool.put(self.sink)
-
-        elif not self.sink.is_closed():
-            # Sink is not closed, close it.
-            self.sink.close()
-
         # Execute callback.
         self.on_close(self)
 
         # Remove references to objects.
-        self.on_close = self.pool = self.sink = None
         self.client = self.message_buffer = self.incoming_buffer = None
 
     cpdef ready(self, object all_ok, object message):
@@ -137,7 +127,7 @@ cdef class SocketSource:
             CLOSED if request throws unexpected exception.
 
         """
-        assert self.is_ready(), 'socket is not ready'
+        assert self.is_waiting(), 'socket is not waiting for answer'
 
         if not all_ok:
             self.close()
@@ -175,14 +165,14 @@ cdef class SocketSource:
             if not self.is_ready():
                 # We aren't ready to transfer message to sink.
                 return
-
-            if self.sink.is_ready():
-                # Message is ready to transfer to sink.
-                self.sink.ready(self.name, self.ready, self.message_buffer.getvalue())
+            elif not self.is_waiting():
+                # Send message to workers.
+                self.producer(self, self.message_buffer.getvalue())
                 # Reset message buffer.
                 self.message_buffer = BytesIO()
+                self.status = WAIT_ANSWER
             else:
-                # Socket was closed while we wait for sink reply.
+                # Socket was closed while we wait for answer.
                 self.close()
 
         except Exception as exc:

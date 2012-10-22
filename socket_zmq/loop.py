@@ -5,12 +5,15 @@ import logging
 
 from pyuv import Async
 
-from .utils import spawn, Event
+from .utils import spawn, Event, in_loop
+from .mixin import LoopMixin
 
 __all__ = ['LoopContainer']
 
+logger = logging.getLogger(__name__)
 
-class LoopContainer(object):
+
+class LoopContainer(LoopMixin):
     """Container for event loop."""
 
     app = None
@@ -18,19 +21,19 @@ class LoopContainer(object):
     def __init__(self):
         self._guard_watcher = None
         self._started = Event()
-
-    @property
-    def loop(self):
-        """Shortcut to loop."""
-        return self.app.loop
+        self._stopped = Event()
 
     def _run(self):
         """Run event loop."""
         self._started.set()
+        loop = self.loop
+        logger.debug('Loop %r started', loop)
         try:
-            self.app.loop.run()
+            loop.run()
+            logger.debug('Loop %r stopped', loop)
+            self._stopped.set()
         except Exception as exc:
-            logging.exception(exc)
+            logger.exception(exc)
 
     def start(self):
         """Start event loop in separate thread."""
@@ -38,7 +41,19 @@ class LoopContainer(object):
         spawn(self._run)
         self._started.wait()
 
+    def cb_handle(self, handle):
+        if not handle.closed:
+            logger.warning('Close stale handle %r', handle)
+            handle.close()
+
+    @in_loop
+    def close_handlers(self):
+        """Close all stale handlers."""
+        self.loop.walk(self.cb_handle)
+
     def stop(self):
         """Stop event loop and wait until it exit."""
         assert self._guard_watcher is not None, 'loop not started'
         self._guard_watcher.close()
+        self.close_handlers()
+        self._stopped.wait()
