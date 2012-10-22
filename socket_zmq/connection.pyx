@@ -147,8 +147,8 @@ cdef class Connection:
             self.client.write(data, self.cb_write_done)
 
     cdef inline void handle_error(self, object error):
-        logger.error('Error with client %r, service %r: %s',
-                     self.peername, self.name, strerror(error))
+        logger.error('Error with client %r: %s',
+                     self.peername, strerror(error))
 
     cpdef cb_read_done(self, object handle, object data, object error):
         if error and error != UV_EOF:

@@ -1,24 +1,15 @@
 """Ventilator that push new request to queue."""
-from collections import deque
+import logging
 
 from pyuv import ThreadPool
 
 from .mixin import LoopMixin
+from .pool import ResourcePool
 from .utils import cached_property
 
 __all__ = ['Ventilator']
 
-
-class WorkerPool(object):
-
-    def __init__(self):
-        self.pool = deque()
-
-    def release(self, worker):
-        self.pool.append(worker)
-
-    def acquire(self):
-        return self.pool.popleft()
+logger = logging.getLogger(__name__)
 
 
 class Ventilator(LoopMixin):
@@ -31,7 +22,7 @@ class Ventilator(LoopMixin):
 
     @cached_property
     def worker_pool(self):
-        return WorkerPool()
+        return ResourcePool()
 
     @cached_property
     def thread_pool(self):
@@ -39,7 +30,7 @@ class Ventilator(LoopMixin):
 
     def register(self, worker):
         self.workers.add(worker)
-        self.worker_pool.release(worker)
+        self.worker_pool.add(worker)
         self.thread_pool.set_parallel_threads(len(self.workers))
 
     def remove(self, worker):
@@ -54,12 +45,18 @@ class Ventilator(LoopMixin):
 
             def cb_work():
                 worker = worker_pool.acquire()
-                success, response = worker.process(service, request)
-                return worker, success, response
+                try:
+                    success, response = worker.process(service, request)
+                finally:
+                    worker.release()
+                return success, response
 
             def cb_after_work(result, exception):
-                worker, success, response = result
-                worker_pool.release(worker)
+                if exception is None:
+                    success, response = result
+                else:
+                    logger.error(exception)
+                    success, response = False, ''
                 connection.ready(success, response)
 
             thread_pool.queue_work(cb_work, cb_after_work)
