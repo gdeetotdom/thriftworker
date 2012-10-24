@@ -12,18 +12,46 @@ from pyuv.errno import UV_EADDRINUSE, strerror
 from .constants import BACKLOG_SIZE
 from .exceptions import BindError
 from .connection import Connection
-from .utils import in_loop, cached_property, get_addresses_from_pool
-from .mixin import LoopMixin
+from .utils.loop import in_loop
+from .utils.decorators import cached_property
+from .utils.other import get_addresses_from_pool
+from .utils.mixin import LoopMixin
 
 __all__ = ['Listener']
 
 logger = logging.getLogger(__name__)
 
 
+class Connections(object):
+    """Store connections."""
+
+    def __init__(self):
+        self.connections = set()
+
+    def register(self, connection):
+        """Register new connection."""
+        self.connections.add(connection)
+
+    def remove(self, connection):
+        """Remove registered connection."""
+        try:
+            self.connections.remove(connection)
+        except KeyError:
+            logger.warning('Connection %r not registered', connection)
+
+    def close(self):
+        while self.connections:
+            connection = self.connections.pop()
+            if not connection.is_closed():
+                connection.close()
+
+
 class Listener(LoopMixin):
     """Facade for proxy. Support lazy initialization."""
 
     app = None
+
+    Connections = Connections
 
     def __init__(self, name, address, backlog=None):
         """Create new listener.
@@ -36,35 +64,36 @@ class Listener(LoopMixin):
         self.name = name
         self.address = address
         self.backlog = backlog or BACKLOG_SIZE
+        self._connections = self.Connections()
 
-    def create_socket(self):
+    def _create_socket(self):
         return TCP(self.loop)
 
     @cached_property
-    def socket(self):
+    def _socket(self):
         """A shortcut to create a TCP socket and bind it."""
-        return self.create_socket()
+        return self._create_socket()
 
     @property
     def host(self):
         """Return host to which this socket is binded."""
-        return self.socket.getsockname()[0]
+        return self._socket.getsockname()[0]
 
     @property
     def port(self):
         """Return binded port number."""
-        return self.socket.getsockname()[1]
+        return self._socket.getsockname()[1]
 
     def _create_acceptor(self):
         service = self.name
         loop = self.loop
-        collector = self.app.collector
-        producer = self.app.ventilator.create_producer(service)
-        server_socket = self.socket
-        socket_factory = self.create_socket
+        connections = self._connections
+        producer = self.app.pool.create_producer(service)
+        server_socket = self._socket
+        socket_factory = self._create_socket
 
         def on_close(connection):
-            collector.remove(connection)
+            connections.remove(connection)
 
         def on_connection(handle, error):
             if error:
@@ -75,14 +104,14 @@ class Listener(LoopMixin):
             client.nodelay(True)
             server_socket.accept(client)
             connection = Connection(producer, loop, client, on_close)
-            collector.register(connection)
+            connections.register(connection)
 
         return on_connection
 
     @in_loop
     def start(self):
         binded = False
-        socket = self.socket
+        socket = self._socket
         acceptor = self._create_acceptor()
         backlog = self.backlog
         addresses = get_addresses_from_pool(self.name, self.address,
@@ -104,4 +133,5 @@ class Listener(LoopMixin):
 
     @in_loop
     def stop(self):
-        self.socket.close()
+        self._socket.close()
+        self._connections.close()

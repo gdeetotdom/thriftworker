@@ -3,10 +3,12 @@ from __future__ import absolute_import
 
 import logging
 
+from threading import Event
 from pyuv import Async
 
-from .utils import spawn, Event, in_loop
-from .mixin import LoopMixin
+from .utils.threads import spawn
+from .utils.loop import in_loop
+from .utils.mixin import LoopMixin
 
 __all__ = ['LoopContainer']
 
@@ -35,25 +37,24 @@ class LoopContainer(LoopMixin):
         except Exception as exc:
             logger.exception(exc)
 
+    @in_loop
+    def _close_handlers(self):
+        """Close all stale handlers."""
+        def cb_handle(handle):
+            if not handle.closed:
+                logger.warning('Close stale handle %r', handle)
+                handle.close()
+        self.loop.walk(cb_handle)
+
     def start(self):
         """Start event loop in separate thread."""
         self._guard_watcher = Async(self.loop, lambda *args: None)
         spawn(self._run)
         self._started.wait()
 
-    def cb_handle(self, handle):
-        if not handle.closed:
-            logger.warning('Close stale handle %r', handle)
-            handle.close()
-
-    @in_loop
-    def close_handlers(self):
-        """Close all stale handlers."""
-        self.loop.walk(self.cb_handle)
-
     def stop(self):
         """Stop event loop and wait until it exit."""
         assert self._guard_watcher is not None, 'loop not started'
         self._guard_watcher.close()
-        self.close_handlers()
+        self._close_handlers()
         self._stopped.wait()
