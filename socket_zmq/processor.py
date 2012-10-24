@@ -1,20 +1,18 @@
-"""Implementation of request processor here.
-
-"""
+"""Implementation of request processor."""
 from __future__ import absolute_import
 
-import logging
 from collections import namedtuple
 
 from thrift.transport.TTransport import TMemoryBuffer
 
-__all__ = ['Worker']
-
-logger = logging.getLogger(__name__)
+__all__ = ['Processor']
 
 
 class Processor(object):
-    """Process new requests and return response."""
+    """Process new requests and return response. Store processor
+    for each service.
+
+    """
 
     app = None
 
@@ -34,20 +32,11 @@ class Processor(object):
         in_transport = TMemoryBuffer(request)
         out_transport = TMemoryBuffer()
 
-        try:
-            service = self.services[name]
-        except KeyError:
-            logger.error('Unknown service %r', name)
-            return False, ''
-
+        service = self.services[name]
         proto_factory = service.proto_factory
         in_prot = proto_factory.getProtocol(in_transport)
         out_prot = proto_factory.getProtocol(out_transport)
 
-        try:
-            service.processor.process(in_prot, out_prot)
-        except Exception as exc:
-            logger.exception(exc)
-            return False, ''
+        service.processor.process(in_prot, out_prot)
 
-        return True, out_transport.getvalue()
+        return out_transport.getvalue()

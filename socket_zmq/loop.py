@@ -29,10 +29,10 @@ class LoopContainer(LoopMixin):
         """Run event loop."""
         self._started.set()
         loop = self.loop
-        logger.debug('Loop %r started', loop)
+        logger.debug('Loop %r started...', loop)
         try:
             loop.run()
-            logger.debug('Loop %r stopped', loop)
+            logger.debug('Loop %r stopped...', loop)
             self._stopped.set()
         except Exception as exc:
             logger.exception(exc)

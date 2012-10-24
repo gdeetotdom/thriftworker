@@ -117,7 +117,8 @@ cdef class Connection:
         self.on_close(self)
 
         # Remove references to objects.
-        self.client = self.message_buffer = self.incoming_buffer = None
+        self.on_close = self.client = self.message_buffer = \
+            self.incoming_buffer = None
 
     cpdef ready(self, object all_ok, object message):
         """The ready can switch Connection to three states:

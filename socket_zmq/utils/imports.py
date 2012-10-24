@@ -61,3 +61,18 @@ def symbol_by_name(name, aliases={}, imp=None, package=None,
         if default is None:
             raise
     return default
+
+
+def instantiate(name, *args, **kwargs):
+    """Instantiate class by name.
+
+    See :func:`symbol_by_name`.
+
+    """
+    return symbol_by_name(name)(*args, **kwargs)
+
+
+def qualname(obj):
+    if not hasattr(obj, '__name__') and hasattr(obj, '__class__'):
+        return qualname(obj.__class__)
+    return '.'.join([obj.__module__, obj.__name__])
