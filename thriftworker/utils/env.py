@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import sys
 
-from socket_zmq.constants import DEFAULT_ENV, GEVENT_ENV
+from thriftworker.constants import DEFAULT_ENV, GEVENT_ENV
 
 __all__ = ['detect_environment']
 

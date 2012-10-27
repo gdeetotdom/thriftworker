@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# socket_zmq documentation build configuration file, created by
+# thriftworker documentation build configuration file, created by
 # sphinx-quickstart on Thu Aug  9 00:44:35 2012.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -40,7 +40,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'socket_zmq'
+project = u'thriftworker'
 copyright = u'2012, Lipin Dmitriy'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -164,7 +164,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'socket_zmqdoc'
+htmlhelp_basename = 'thriftworkerdoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -183,7 +183,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'socket_zmq.tex', u'socket\\_zmq Documentation',
+  ('index', 'thriftworker.tex', u'socket\\_zmq Documentation',
    u'Lipin Dmitriy', 'manual'),
 ]
 
@@ -213,7 +213,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'socket_zmq', u'socket_zmq Documentation',
+    ('index', 'thriftworker', u'socket_zmq Documentation',
      [u'Lipin Dmitriy'], 1)
 ]
 
@@ -227,8 +227,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'socket_zmq', u'socket_zmq Documentation',
-   u'Lipin Dmitriy', 'socket_zmq', 'One line description of project.',
+  ('index', 'thriftworker', u'socket_zmq Documentation',
+   u'Lipin Dmitriy', 'thriftworker', 'One line description of project.',
    'Miscellaneous'),
 ]
 

@@ -8,7 +8,7 @@ from setuptools.command.build_ext import build_ext
 
 
 if sys.version_info < (2, 7):
-    raise Exception('ThriftPool requires Python 2.7.')
+    raise Exception('ThriftWorker requires Python 2.7.')
 
 
 #-----------------------------------------------------------------------------
@@ -38,7 +38,7 @@ class CheckSDist(sdist):
     def initialize_options(self):
         sdist.initialize_options(self)
         self._pyxfiles = []
-        for root, dirs, files in os.walk('socket_zmq'):
+        for root, dirs, files in os.walk('thriftworker'):
             for f in files:
                 if f.endswith('.pyx'):
                     self._pyxfiles.append(os.path.join(root, f))
@@ -107,13 +107,13 @@ suffix = '.pyx' if cython_installed else '.c'
 
 
 def source_extension(name):
-    return os.path.join('socket_zmq', name + suffix)
+    return os.path.join('thriftworker', name + suffix)
 
 
 # collect extensions
 for module in ['connection']:
     sources = [source_extension(module)]
-    ext = Extension('socket_zmq.{0}'.format(module),
+    ext = Extension('thriftworker.{0}'.format(module),
                     sources=sources,
                     **extension_kwargs)
     if suffix == '.pyx' and ext.sources[0].endswith('.c'):
@@ -149,7 +149,7 @@ pats = {re_meta: add_default,
         re_vers: add_version,
         re_doc: add_doc}
 here = os.path.abspath(os.path.dirname(__file__))
-meta_fh = open(os.path.join(here, 'socket_zmq/__init__.py'))
+meta_fh = open(os.path.join(here, 'thriftworker/__init__.py'))
 try:
     meta = {}
     for line in meta_fh:
@@ -168,7 +168,7 @@ finally:
 #-----------------------------------------------------------------------------
 
 setup(
-    name='socket_zmq',
+    name='thriftworker',
     version=meta['VERSION'],
     description=meta['doc'],
     author=meta['author'],

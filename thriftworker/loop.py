@@ -1,6 +1,7 @@
 """Container for event loop. Prevent loop to exit when no watchers exists."""
 from __future__ import absolute_import
 
+import cProfile
 import logging
 
 from threading import Event
@@ -21,6 +22,7 @@ class LoopContainer(LoopMixin):
     app = None
 
     def __init__(self):
+        self._profile = cProfile.Profile()
         self._guard_watcher = None
         self._started = Event()
         self._stopped = Event()
@@ -31,7 +33,8 @@ class LoopContainer(LoopMixin):
         loop = self.loop
         logger.debug('Loop %r started...', loop)
         try:
-            loop.run()
+            self._profile.runcall(loop.run)
+            self._profile.dump_stats('loop.prof')
             logger.debug('Loop %r stopped...', loop)
             self._stopped.set()
         except Exception as exc:

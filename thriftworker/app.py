@@ -19,9 +19,10 @@ __all__ = ['SocketZMQ']
 
 
 class SocketZMQ(SubclassMixin):
-    """Factory for socket_zmq."""
+    """Factory for thriftworker."""
 
-    pool_cls = 'socket_zmq.strategies.solo:SoloPool'
+    #pool_cls = 'thriftworker.strategies.solo:SoloPool'
+    pool_cls = 'thriftworker.strategies.threadpool:ThreadPool'
 
     def __init__(self, protocol_factory=None, port_range=None):
         # Set provided instance if we can.

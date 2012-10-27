@@ -167,11 +167,12 @@ cdef class Connection:
                 # We aren't ready to transfer message to sink.
                 return
             elif not self.is_waiting():
+                # Change state to needed.
+                self.status = WAIT_ANSWER
                 # Send message to workers.
                 self.producer(self, self.message_buffer.getvalue())
                 # Reset message buffer.
                 self.message_buffer = BytesIO()
-                self.status = WAIT_ANSWER
             else:
                 # Socket was closed while we wait for answer.
                 self.close()
