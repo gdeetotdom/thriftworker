@@ -11,7 +11,7 @@ __all__ = ['generate_docs', 'upload_docs']
 def generate_docs(clean='no'):
     """Generate the Sphinx documentation."""
     c = ""
-    local('sphinx-apidoc -f -o docs/source/api socket_zmq')
+    local('sphinx-apidoc -f -o docs/source/api thriftworker')
     if clean.lower() in ['yes', 'y']:
         c = "clean "
     with lcd('docs'):
@@ -24,7 +24,7 @@ def upload_docs():
     build = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                          'docs', 'html')
     with lcd(path):
-        local('git clone git@github.com:blackwithwhite666/socket_zmq.git .')
+        local('git clone git@github.com:blackwithwhite666/thriftworker.git .')
         local('git checkout gh-pages')
         local('git rm -r .')
         local('touch .nojekyll')

@@ -1,4 +1,4 @@
-"""Proxy from thrift framed transport to zmq."""
+"""Process incoming request and return it's result."""
 
 VERSION = (0, 1, 6)
 
@@ -10,4 +10,4 @@ __docformat__ = 'restructuredtext'
 
 # -eof meta-
 
-from .app import SocketZMQ
+from .app import ThriftWorker

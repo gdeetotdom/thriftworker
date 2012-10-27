@@ -15,8 +15,7 @@ def get_current_app():
     global default_app
     if default_app is None:
         # creates the default app, but we want to defer that.
-        from .app import SocketZMQ
-        set_current_app(SocketZMQ())
+        raise RuntimeError('No ThriftWorker was configured!')
     return default_app
 
 

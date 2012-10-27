@@ -88,7 +88,7 @@ class Listener(LoopMixin):
         service = self.name
         loop = self.loop
         connections = self._connections
-        producer = self.app.pool.create_producer(service)
+        producer = self.app.worker.create_producer(service)
         server_socket = self._socket
         socket_factory = self._create_socket
 

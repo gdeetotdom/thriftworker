@@ -11,25 +11,24 @@ from thrift.protocol import TBinaryProtocol
 from .state import set_current_app, get_current_app
 from .listener import Listener
 from .loop import LoopContainer
-from .processor import Processor
+from .services import Services
+from .worker import Worker
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
 
-__all__ = ['SocketZMQ']
 
+class ThriftWorker(SubclassMixin):
+    """Store global application state. Also acts as factory for whole
+    application.
 
-class SocketZMQ(SubclassMixin):
-    """Factory for thriftworker."""
-
-    #pool_cls = 'thriftworker.strategies.solo:SoloPool'
-    pool_cls = 'thriftworker.strategies.threadpool:ThreadPool'
+    """
 
     def __init__(self, protocol_factory=None, port_range=None):
         # Set provided instance if we can.
         if protocol_factory is not None:
             self.protocol_factory = protocol_factory
         self.port_range = port_range
-        super(SocketZMQ, self).__init__()
+        super(ThriftWorker, self).__init__()
         set_current_app(self)
 
     @staticmethod
@@ -58,24 +57,24 @@ class SocketZMQ(SubclassMixin):
         return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
     @cached_property
-    def Processor(self):
+    def Services(self):
         """Create bounded :class:`Processor` class."""
-        return self.subclass_with_self(Processor)
+        return self.subclass_with_self(Services)
 
     @cached_property
-    def processor(self):
+    def services(self):
         """Create global request processor instance."""
-        return self.Processor()
+        return self.Services()
 
     @cached_property
-    def Pool(self):
+    def Worker(self):
         """Create bounded pool class."""
-        return self.subclass_with_self(self.pool_cls, reverse='Pool')
+        return self.subclass_with_self(Worker)
 
     @cached_property
-    def pool(self):
+    def worker(self):
         """Create pool."""
-        return self.Pool()
+        return self.Worker()
 
     @cached_property
     def Listener(self):
