@@ -1,4 +1,4 @@
-"""SocketZMQ.
+"""ThriftWorker.
 
 Distribute thrift requests between workers.
 
@@ -9,6 +9,7 @@ from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
 from .state import set_current_app, get_current_app
+from .acceptor import Acceptor
 from .listener import Listener
 from .loop import LoopContainer
 from .services import Services
@@ -23,8 +24,10 @@ class ThriftWorker(SubclassMixin):
 
     """
 
-    def __init__(self, protocol_factory=None, port_range=None):
+    def __init__(self, loop=None, protocol_factory=None, port_range=None):
         # Set provided instance if we can.
+        if loop is not None:
+            self.loop = loop
         if protocol_factory is not None:
             self.protocol_factory = protocol_factory
         self.port_range = port_range
@@ -80,3 +83,7 @@ class ThriftWorker(SubclassMixin):
     def Listener(self):
         """Create bounded :class:`Listener` class."""
         return self.subclass_with_self(Listener)
+
+    @cached_property
+    def Acceptor(self):
+        return self.subclass_with_self(Acceptor)

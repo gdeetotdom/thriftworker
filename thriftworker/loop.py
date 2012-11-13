@@ -6,7 +6,7 @@ import logging
 from threading import Event
 from pyuv import Async
 
-from .utils.threads import spawn
+from .utils.threads import spawn, get_ident
 from .utils.loop import in_loop
 from .utils.mixin import LoopMixin
 
@@ -27,9 +27,10 @@ class LoopContainer(LoopMixin):
 
     def _run(self):
         """Run event loop."""
-        self._started.set()
         loop = self.loop
+        setattr(loop, 'ident', get_ident())
         logger.debug('Loop %r started...', loop)
+        self._started.set()
         try:
             loop.run()
             logger.debug('Loop %r stopped...', loop)
@@ -42,7 +43,7 @@ class LoopContainer(LoopMixin):
         """Close all stale handlers."""
         def cb_handle(handle):
             if not handle.closed:
-                logger.warning('Close stale handle %r', handle)
+                logger.debug('Close stale handle %r', handle)
                 handle.close()
         self.loop.walk(cb_handle)
 

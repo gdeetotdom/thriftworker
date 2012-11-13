@@ -35,6 +35,10 @@ def spawn(func, *args, **kwargs):
     return get_realthread().start_new_thread(func, args, kwargs)
 
 
+def get_ident():
+    return get_realthread().get_ident()
+
+
 class DaemonThread(Thread):
 
     def __init__(self, name=None, **kwargs):

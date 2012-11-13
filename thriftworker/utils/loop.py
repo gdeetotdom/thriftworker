@@ -7,6 +7,8 @@ from functools import wraps
 
 from pyuv import Async
 
+from .threads import get_ident
+
 
 class in_loop(object):
     """Schedule execution of given function in main event loop. Wait for
@@ -57,7 +59,11 @@ class in_loop(object):
             else:
                 return result
 
-        return inner_decorator
+        if obj.loop.ident == get_ident():
+            # Don't block main loop.
+            return method
+        else:
+            return inner_decorator
 
     def __get__(self, obj, type=None):
         if obj is None:
