@@ -21,7 +21,7 @@ class LoopContainer(LoopMixin):
     app = None
 
     def __init__(self):
-        self._guard_watcher = None
+        self._guard = None
         self._started = Event()
         self._stopped = Event()
 
@@ -29,11 +29,11 @@ class LoopContainer(LoopMixin):
         """Run event loop."""
         loop = self.loop
         setattr(loop, 'ident', get_ident())
-        logger.debug('Loop %r started...', loop)
+        logger.debug('Loop #%r started...', id(loop))
         self._started.set()
         try:
             loop.run()
-            logger.debug('Loop %r stopped...', loop)
+            logger.debug('Loop #%r stopped...', id(loop))
             self._stopped.set()
         except Exception as exc:
             logger.exception(exc)
@@ -49,13 +49,15 @@ class LoopContainer(LoopMixin):
 
     def start(self):
         """Start event loop in separate thread."""
-        self._guard_watcher = Async(self.loop, lambda *args: None)
+        async = self._guard = Async(self.loop, lambda h: None)
+        async.send()
         spawn(self._run)
         self._started.wait()
 
     def stop(self):
         """Stop event loop and wait until it exit."""
-        assert self._guard_watcher is not None, 'loop not started'
-        self._guard_watcher.close()
+        assert self._guard is not None, 'loop not started'
+        if self._guard.active:
+            self._guard.close()
         self._close_handlers()
         self._stopped.wait()

@@ -7,7 +7,7 @@ graft docs
 prune docs/build
 prune docs/html
 
-graft socket_zmq
+graft thriftworker
 
 global-exclude *.so
 global-exclude *.pyd
