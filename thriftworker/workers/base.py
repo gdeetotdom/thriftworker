@@ -45,3 +45,9 @@ class BaseWorker(LoopMixin):
             consume(Request(connection=connection, data=data))
 
         return inner_producer
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
