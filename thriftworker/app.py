@@ -9,11 +9,9 @@ from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
 from .state import set_current_app, get_current_app
-from .acceptor import Acceptor
 from .listener import Listener
 from .loop import LoopContainer
 from .services import Services
-from .worker import Worker
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
 
@@ -23,6 +21,9 @@ class ThriftWorker(SubclassMixin):
     application.
 
     """
+
+    worker_cls = 'thriftworker.workers.sync:SyncWorker'
+    acceptor_cls = 'thriftworker.transports.framed:FramedAcceptor'
 
     def __init__(self, loop=None, protocol_factory=None, port_range=None):
         # Set provided instance if we can.
@@ -70,20 +71,19 @@ class ThriftWorker(SubclassMixin):
         return self.Services()
 
     @cached_property
-    def Worker(self):
-        """Create bounded pool class."""
-        return self.subclass_with_self(Worker)
-
-    @cached_property
-    def worker(self):
-        """Create pool."""
-        return self.Worker()
-
-    @cached_property
     def Listener(self):
         """Create bounded :class:`Listener` class."""
         return self.subclass_with_self(Listener)
 
     @cached_property
     def Acceptor(self):
-        return self.subclass_with_self(Acceptor)
+        return self.subclass_with_self(self.acceptor_cls, reverse='Acceptor')
+
+    @cached_property
+    def Worker(self):
+        return self.subclass_with_self(self.worker_cls, reverse='Worker')
+
+    @cached_property
+    def worker(self):
+        """Create pool."""
+        return self.Worker()

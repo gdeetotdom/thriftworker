@@ -1,29 +1,22 @@
-"""Base pool implementation."""
 from __future__ import absolute_import
 
 import logging
 from collections import namedtuple
+from abc import ABCMeta, abstractmethod
 
-from pyuv import ThreadPool
-
-from .utils.decorators import cached_property
+from thriftworker.utils.mixin import LoopMixin
 
 logger = logging.getLogger(__name__)
 
 
-class Worker(object):
-    """Process all request in separate thread."""
+class BaseWorker(LoopMixin):
 
-    app = None
+    __metaclass__ = ABCMeta
 
     #: Store request in this tuple.
     Request = namedtuple('Request', 'connection data')
 
-    @cached_property
-    def pool(self):
-        return ThreadPool(self.app.loop)
-
-    def create_callback(self, request):
+    def _create_callback(self, request):
         """Create callback that should be called after request was done."""
         connection = request.connection
 
@@ -37,17 +30,9 @@ class Worker(object):
 
         return inner_callback
 
+    @abstractmethod
     def create_consumer(self, processor):
-        create_callback = self.create_callback
-        pool = self.pool
-
-        def inner_consumer(request):
-            # Nested function that process incoming request.
-            task = lambda: processor(request.data)
-            # Put task to pool.
-            pool.queue_work(task, create_callback(request))
-
-        return inner_consumer
+        raise NotImplementedError()
 
     def create_producer(self, service):
         """Create producer for connections."""

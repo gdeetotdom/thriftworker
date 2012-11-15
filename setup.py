@@ -107,11 +107,13 @@ suffix = '.pyx' if cython_installed else '.c'
 
 
 def source_extension(name):
-    return os.path.join('thriftworker', name + suffix)
+    parts = name.split('.')
+    parts[-1] = parts[-1] + suffix
+    return os.path.join('thriftworker', *parts)
 
 
 # collect extensions
-for module in ['connection']:
+for module in ['transports.framed.connection']:
     sources = [source_extension(module)]
     ext = Extension('thriftworker.{0}'.format(module),
                     sources=sources,

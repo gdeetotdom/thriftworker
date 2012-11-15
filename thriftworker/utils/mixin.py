@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 from ..state import current_app
+from .imports import symbol_by_name
 from .other import rgetattr
 
 __all__ = ['LoopMixin', 'SubclassMixin', 'PropertyMixin']
@@ -43,11 +44,12 @@ class SubclassMixin(object):
                             default is 'app'.
 
         """
+        Class = symbol_by_name(Class)
         reverse = reverse if reverse else Class.__name__
 
         def __reduce__(self):
             return (_unpickle_appattr,
-                    (Class.__name__, self.__reduce_args__()))
+                    (reverse, self.__reduce_args__()))
 
         attrs = dict({attribute: self},
                      __module__=Class.__module__,

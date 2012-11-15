@@ -6,9 +6,7 @@ cimport cython
 
 from pyuv.errno import strerror, UV_EOF
 
-from .constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
-
-__all__ = ['Connection']
+from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
 
 logger = getLogger(__name__)
 

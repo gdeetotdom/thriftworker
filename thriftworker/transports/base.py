@@ -1,16 +1,14 @@
 from __future__ import absolute_import
 
 import logging
+from abc import ABCMeta, abstractproperty
 
 from pyuv import TCP
 from pyuv.errno import strerror
 
-from .constants import BACKLOG_SIZE
-from .connection import Connection
-from .utils.loop import in_loop
-from .utils.mixin import LoopMixin
-
-__all__ = ['Listener']
+from thriftworker.constants import BACKLOG_SIZE
+from thriftworker.utils.mixin import LoopMixin
+from thriftworker.utils.loop import in_loop
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +37,9 @@ class Connections(object):
                 connection.close()
 
 
-class Acceptor(LoopMixin):
+class BaseAcceptor(LoopMixin):
 
-    app = None
+    __metaclass__ = ABCMeta
 
     Connections = Connections
 
@@ -50,7 +48,11 @@ class Acceptor(LoopMixin):
         self.socket = socket
         self.backlog = backlog or BACKLOG_SIZE
         self._connections = self.Connections()
-        super(Acceptor, self).__init__()
+        super(BaseAcceptor, self).__init__()
+
+    @abstractproperty
+    def Connection(self):
+        raise NotImplementedError()
 
     def _create_acceptor(self):
         service = self.name
@@ -70,7 +72,7 @@ class Acceptor(LoopMixin):
             client = TCP(loop)
             client.nodelay(True)
             server_socket.accept(client)
-            connection = Connection(producer, loop, client, on_close)
+            connection = self.Connection(producer, loop, client, on_close)
             connections.register(connection)
 
         return on_connection
