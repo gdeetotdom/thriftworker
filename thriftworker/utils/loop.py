@@ -2,12 +2,11 @@
 from __future__ import absolute_import
 
 import sys
-from threading import Event
 from functools import wraps
 
 from pyuv import Async
 
-from .threads import get_ident
+from thriftworker.state import current_app
 
 
 class in_loop(object):
@@ -27,11 +26,11 @@ class in_loop(object):
 
         @wraps(self.__func)
         def inner_decorator(*args, **kwargs):
-            event = Event()
+            event = current_app.env.RealEvent()
             d = {'result': None, 'tb': None}
 
-            def inner_callback(async_handle):
-                async.close()
+            def inner_callback(handle):
+                handle.close()
                 try:
                     d['result'] = method(*args, **kwargs)
                 except Exception as exc:
@@ -41,7 +40,7 @@ class in_loop(object):
                 finally:
                     event.set()
 
-            async = Async(obj.loop, inner_callback)
+            async = Async(current_app.loop, inner_callback)
             async.send()
             try:
                 if not event.wait(self.__timeout):
@@ -59,7 +58,12 @@ class in_loop(object):
             else:
                 return result
 
-        if obj.loop.ident == get_ident():
+        try:
+            ident = current_app.loop.ident
+        except AttributeError:
+            raise RuntimeError('Loop not started')
+
+        if ident == current_app.env.get_real_ident():
             # Don't block main loop.
             return method
         else:

@@ -8,12 +8,14 @@ from __future__ import absolute_import
 from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
+from . import constants
 from .state import set_current_app, get_current_app
 from .listener import Listener
 from .loop import LoopContainer
 from .services import Services
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
+from .utils.env import detect_environment
 
 
 class ThriftWorker(SubclassMixin):
@@ -22,7 +24,6 @@ class ThriftWorker(SubclassMixin):
 
     """
 
-    worker_cls = 'thriftworker.workers.sync:SyncWorker'
     acceptor_cls = 'thriftworker.transports.framed:FramedAcceptor'
 
     def __init__(self, loop=None, protocol_factory=None, port_range=None):
@@ -61,6 +62,15 @@ class ThriftWorker(SubclassMixin):
         return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
     @cached_property
+    def Env(self):
+        cls = constants.ENVS[detect_environment()]
+        return self.subclass_with_self(cls, reverse='Env')
+
+    @cached_property
+    def env(self):
+        return self.Env()
+
+    @cached_property
     def Services(self):
         """Create bounded :class:`Processor` class."""
         return self.subclass_with_self(Services)
@@ -81,7 +91,8 @@ class ThriftWorker(SubclassMixin):
 
     @cached_property
     def Worker(self):
-        return self.subclass_with_self(self.worker_cls, reverse='Worker')
+        cls = constants.WORKERS[detect_environment()]
+        return self.subclass_with_self(cls, reverse='Worker')
 
     @cached_property
     def worker(self):

@@ -3,10 +3,8 @@ from __future__ import absolute_import
 
 import logging
 
-from threading import Event
 from pyuv import Async
 
-from .utils.threads import spawn, get_ident
 from .utils.loop import in_loop
 from .utils.mixin import LoopMixin
 
@@ -22,13 +20,13 @@ class LoopContainer(LoopMixin):
 
     def __init__(self):
         self._guard = None
-        self._started = Event()
-        self._stopped = Event()
+        self._started = self.app.env.RealEvent()
+        self._stopped = self.app.env.RealEvent()
 
     def _run(self):
         """Run event loop."""
         loop = self.loop
-        setattr(loop, 'ident', get_ident())
+        setattr(loop, 'ident', self.app.env.get_real_ident())
         logger.debug('Loop #%r started...', id(loop))
         self._started.set()
         try:
@@ -51,7 +49,7 @@ class LoopContainer(LoopMixin):
         """Start event loop in separate thread."""
         async = self._guard = Async(self.loop, lambda h: None)
         async.send()
-        spawn(self._run)
+        self.app.env.start_real_thread(self._run)
         self._started.wait()
 
     def stop(self):

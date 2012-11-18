@@ -1,8 +1,6 @@
 """Some decorator implementations."""
 from __future__ import absolute_import
 
-__all__ = ['cached_property']
-
 
 class cached_property(object):
     """Property descriptor that caches the return value

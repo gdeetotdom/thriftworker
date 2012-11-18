@@ -5,8 +5,6 @@ import sys
 
 from thriftworker.constants import DEFAULT_ENV, GEVENT_ENV
 
-__all__ = ['detect_environment']
-
 _environment = None
 
 

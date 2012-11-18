@@ -20,7 +20,7 @@ class BaseWorker(LoopMixin):
         """Create callback that should be called after request was done."""
         connection = request.connection
 
-        def inner_callback(result, exception):
+        def inner_callback(result, exception=None):
             if exception is None:
                 success, response = True, result
             else:

@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import sys
+import imp
 import importlib
 
 
@@ -76,3 +77,15 @@ def qualname(obj):
     if not hasattr(obj, '__name__') and hasattr(obj, '__class__'):
         return qualname(obj.__class__)
     return '.'.join([obj.__module__, obj.__name__])
+
+
+def get_real_module(name):
+    """Get the real Python module, regardless of any monkeypatching"""
+    fp, pathname, description = imp.find_module(name)
+    try:
+        _realmodule = imp.load_module('_real_{0}'.format(name), fp, pathname,
+                                      description)
+        return _realmodule
+    finally:
+        if fp:
+            fp.close()
