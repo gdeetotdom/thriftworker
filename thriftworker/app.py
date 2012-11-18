@@ -26,13 +26,17 @@ class ThriftWorker(SubclassMixin):
 
     acceptor_cls = 'thriftworker.transports.framed:FramedAcceptor'
 
-    def __init__(self, loop=None, protocol_factory=None, port_range=None):
+    def __init__(self, loop=None, protocol_factory=None, port_range=None,
+                 pool_size=None):
         # Set provided instance if we can.
         if loop is not None:
             self.loop = loop
         if protocol_factory is not None:
             self.protocol_factory = protocol_factory
         self.port_range = port_range
+        if pool_size is not None and pool_size < 0:
+            raise ValueError('Pool size can not be negative.')
+        self.pool_size = pool_size or 1
         super(ThriftWorker, self).__init__()
         set_current_app(self)
 
@@ -61,10 +65,19 @@ class ThriftWorker(SubclassMixin):
         """Specify which protocol should be used."""
         return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
+    @property
+    def env_cls(self):
+        env = detect_environment()
+        if env == constants.GEVENT_ENV:
+            return 'thriftworker.envs.green:GeventEnv'
+        elif env == constants.DEFAULT_ENV:
+            return 'thriftworker.envs.sync:SyncEnv'
+        else:
+            raise NotImplementedError()
+
     @cached_property
     def Env(self):
-        cls = constants.ENVS[detect_environment()]
-        return self.subclass_with_self(cls, reverse='Env')
+        return self.subclass_with_self(self.env_cls, reverse='Env')
 
     @cached_property
     def env(self):
@@ -89,10 +102,22 @@ class ThriftWorker(SubclassMixin):
     def Acceptor(self):
         return self.subclass_with_self(self.acceptor_cls, reverse='Acceptor')
 
+    @property
+    def worker_cls(self):
+        env = detect_environment()
+        if env == constants.GEVENT_ENV:
+            return 'thriftworker.workers.green:GeventWorker'
+        elif env == constants.DEFAULT_ENV:
+            if self.pool_size == 1:
+                return 'thriftworker.workers.sync:SyncWorker'
+            else:
+                return 'thriftworker.workers.threads:ThreadsWorker'
+        else:
+            raise NotImplementedError()
+
     @cached_property
     def Worker(self):
-        cls = constants.WORKERS[detect_environment()]
-        return self.subclass_with_self(cls, reverse='Worker')
+        return self.subclass_with_self(self.worker_cls, reverse='Worker')
 
     @cached_property
     def worker(self):

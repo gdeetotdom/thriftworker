@@ -89,6 +89,7 @@ class GeventWorker(BaseWorker):
         self._worker_async_handle.start(lambda: None)
 
     def stop(self):
+        self._pool.join()
         self._worker_async_handle.stop()
         self._worker_prepare_handle.stop()
         self._acceptor_async_handle.close()
