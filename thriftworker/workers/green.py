@@ -21,33 +21,29 @@ class GeventWorker(BaseWorker):
         self._outgoing = deque()
         super(GeventWorker, self).__init__()
 
-    @property
-    def _hub(self):
-        return get_hub()
-
     @cached_property
     def _pool(self):
         return Pool()
 
     @cached_property
-    def _pyuv_prepare_handle(self):
+    def _acceptor_prepare_handle(self):
         return Prepare(self.loop)
 
     @cached_property
-    def _pyuv_async_handle(self):
+    def _acceptor_async_handle(self):
         return Async(self.loop, lambda handle: None)
 
     @cached_property
-    def _gevent_prepare_handle(self):
-        return self._hub.loop.prepare()
+    def _worker_prepare_handle(self):
+        return get_hub().loop.prepare()
 
     @cached_property
-    def _gevent_async_handle(self):
-        return self._hub.loop.async()
+    def _worker_async_handle(self):
+        return get_hub().loop.async()
 
     def create_consumer(self, processor):
         incoming = self._incoming
-        async = self._gevent_async_handle
+        async = self._worker_async_handle
         create_callback = self._create_callback
 
         def inner_consumer(request):
@@ -63,34 +59,37 @@ class GeventWorker(BaseWorker):
         except Exception as exc:
             exception = exc
         self._outgoing.append(partial(callback, result, exception))
-        self._pyuv_async_handle.send()
+        self._acceptor_async_handle.send()
 
-    def _before_gevent_iteration(self):
+    def _before_worker_iteration(self):
         pool = self._pool
+        process_request = self._process_request
+        incoming = self._incoming
         while True:
             try:
-                args = self._incoming.popleft()
+                args = incoming.popleft()
             except IndexError:
                 break
             else:
-                pool.apply_async(self._process_request, args=args)
+                pool.apply_async(process_request, args)
 
-    def _before_pyuv_iteration(self, handle):
+    def _before_acceptor_iteration(self, handle):
+        outgoing = self._outgoing
         while True:
             try:
-                callback = self._outgoing.popleft()
+                callback = outgoing.popleft()
             except IndexError:
                 break
             else:
                 callback()
 
     def start(self):
-        self._pyuv_prepare_handle.start(self._before_pyuv_iteration)
-        self._gevent_prepare_handle.start(self._before_gevent_iteration)
-        self._gevent_async_handle.start(lambda: None)
+        self._acceptor_prepare_handle.start(self._before_acceptor_iteration)
+        self._worker_prepare_handle.start(self._before_worker_iteration)
+        self._worker_async_handle.start(lambda: None)
 
     def stop(self):
-        self._gevent_async_handle.stop()
-        self._gevent_prepare_handle.stop()
-        self._pyuv_async_handle.close()
-        self._pyuv_prepare_handle.close()
+        self._worker_async_handle.stop()
+        self._worker_prepare_handle.stop()
+        self._acceptor_async_handle.close()
+        self._acceptor_prepare_handle.close()
