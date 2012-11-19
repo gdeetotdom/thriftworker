@@ -5,6 +5,8 @@ Distribute thrift requests between workers.
 """
 from __future__ import absolute_import
 
+import logging
+
 from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
@@ -16,6 +18,8 @@ from .services import Services
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
 from .utils.env import detect_environment
+
+logger = logging.getLogger(__name__)
 
 
 class ThriftWorker(SubclassMixin):
@@ -81,6 +85,7 @@ class ThriftWorker(SubclassMixin):
 
     @cached_property
     def env(self):
+        logger.debug('Using {0!r} env'.format(self.Env))
         return self.Env()
 
     @cached_property
@@ -122,4 +127,5 @@ class ThriftWorker(SubclassMixin):
     @cached_property
     def worker(self):
         """Create pool."""
+        logger.debug('Using {0!r} worker'.format(self.Worker))
         return self.Worker()

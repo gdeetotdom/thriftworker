@@ -103,7 +103,8 @@ class ThreadsWorker(BaseWorker):
         outgoing = self._outgoing
         wakeup = lambda: async.send()
         callback = lambda fn: outgoing.append(fn)
-        return Pool(wakeup=wakeup, callback=callback)
+        return Pool(wakeup=wakeup, callback=callback,
+                    size=self.app.pool_size)
 
     def _before_iteration(self, handle):
         outgoing = self._outgoing

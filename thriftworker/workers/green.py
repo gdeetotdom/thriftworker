@@ -23,7 +23,7 @@ class GeventWorker(BaseWorker):
 
     @cached_property
     def _pool(self):
-        return Pool()
+        return Pool(size=self.app.pool_size)
 
     @cached_property
     def _acceptor_prepare_handle(self):
