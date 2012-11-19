@@ -150,7 +150,7 @@ cdef class Connection:
                      self.peername, strerror(error))
 
     cpdef cb_read_done(self, object handle, object data, object error):
-        if error and error != UV_EOF:
+        if error:
             self.handle_error(error)
             self.close()
             return
