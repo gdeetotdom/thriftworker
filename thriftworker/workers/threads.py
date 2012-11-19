@@ -77,7 +77,8 @@ class Pool(object):
             worker.start()
 
     def stop(self):
-        self._tasks.put(None)
+        for _ in self._workers:
+            self._tasks.put(None)
         for worker in self._workers:
             worker.wait()
 
