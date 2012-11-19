@@ -68,6 +68,7 @@ class Listener(LoopMixin):
         if not binded:
             raise BindError("Service {0!r} can't bind to address {1!r}"
                             .format(self.name, self.address))
+        sock.listen(self.backlog)
         self.channel.open(sock.fileno())
 
     @in_loop
