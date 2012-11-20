@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import sys
 import logging
 from functools import partial
 from collections import deque
@@ -56,8 +57,8 @@ class GeventWorker(BaseWorker):
         result, exception = None, None
         try:
             result = processor(request.data)
-        except Exception as exc:
-            exception = exc
+        except:
+            exception = sys.exc_info()
         self._outgoing.append(partial(callback, result, exception))
         self._acceptor_async_handle.send()
 

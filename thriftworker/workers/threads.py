@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import sys
 import logging
 from threading import Thread, Event
 from collections import deque
@@ -42,8 +43,8 @@ class Worker(Thread):
             processor, request, callback = task
             try:
                 result = processor(request.data)
-            except Exception as exc:
-                exception = exc
+            except:
+                exception = sys.exc_info()
             cb(partial(callback, result, exception))
             wakeup()
 

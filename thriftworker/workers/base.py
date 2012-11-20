@@ -24,7 +24,7 @@ class BaseWorker(LoopMixin):
             if exception is None:
                 success, response = True, result
             else:
-                logger.error(exception)
+                logger.error(exception[1], exc_info=exception)
                 success, response = False, ''
             connection.ready(success, response)
 
