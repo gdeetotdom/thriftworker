@@ -38,7 +38,9 @@ class Listener(LoopMixin):
 
     @cached_property
     def channel(self):
-        return Pipe(self.loop)
+        pipe = Pipe(self.loop)
+        pipe.open(self.socket.fileno())
+        return pipe
 
     @property
     def host(self):
@@ -69,8 +71,8 @@ class Listener(LoopMixin):
             raise BindError("Service {0!r} can't bind to address {1!r}"
                             .format(self.name, self.address))
         sock.listen(self.backlog)
-        self.channel.open(sock.fileno())
 
     @in_loop
     def stop(self):
-        self.socket.close()
+        if not self.channel.closed:
+            self.channel.close()

@@ -26,7 +26,8 @@ class BaseWorker(LoopMixin):
             else:
                 logger.error(exception[1], exc_info=exception)
                 success, response = False, ''
-            connection.ready(success, response)
+            if connection.is_waiting():
+                connection.ready(success, response)
 
         return inner_callback
 
