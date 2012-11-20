@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import logging
 
 from pyuv import Async
+from pyuv.error import HandleError
 
 from .utils.loop import in_loop
 from .utils.mixin import LoopMixin
@@ -22,6 +23,13 @@ class LoopContainer(LoopMixin):
         self._guard = None
         self._started = self.app.env.RealEvent()
         self._stopped = self.app.env.RealEvent()
+
+    def wakeup(self):
+        assert self._guard is not None, 'loop not started'
+        try:
+            self._guard.send()
+        except HandleError:
+            pass
 
     def _run(self):
         """Run event loop."""
@@ -47,15 +55,17 @@ class LoopContainer(LoopMixin):
 
     def start(self):
         """Start event loop in separate thread."""
+        # Prevent loop exit.
         async = self._guard = Async(self.loop, lambda h: None)
         async.send()
+        # Start loop in separate thread.
         self.app.env.start_real_thread(self._run)
         self._started.wait()
 
     def stop(self):
         """Stop event loop and wait until it exit."""
-        assert self._guard is not None, 'loop not started'
+        self.wakeup()
+        self._close_handlers()
         if self._guard.active:
             self._guard.close()
-        self._close_handlers()
         self._stopped.wait()

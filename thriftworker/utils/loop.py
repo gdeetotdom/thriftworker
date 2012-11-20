@@ -4,9 +4,11 @@ from __future__ import absolute_import
 import sys
 from functools import wraps
 
-from pyuv import Async
+from pyuv import Prepare, Idle
 
 from thriftworker.state import current_app
+
+from .decorators import cached_property
 
 
 class in_loop(object):
@@ -21,16 +23,28 @@ class in_loop(object):
         self.__doc__ = func.__doc__
         self.__timeout = timeout or 5.0
 
+    @cached_property
+    def _spinner(self):
+        return Idle(current_app.loop)
+
+    @cached_property
+    def _dispatcher(self):
+        return Prepare(current_app.loop)
+
+    @cached_property
+    def _is_done(self):
+        return current_app.env.RealEvent()
+
     def __create(self, obj):
         method = self.__func.__get__(obj)
 
         @wraps(self.__func)
         def inner_decorator(*args, **kwargs):
-            event = current_app.env.RealEvent()
+            event = self._is_done
             d = {'result': None, 'tb': None}
 
             def inner_callback(handle):
-                handle.close()
+                handle.stop()
                 try:
                     d['result'] = method(*args, **kwargs)
                 except Exception as exc:
@@ -40,16 +54,15 @@ class in_loop(object):
                 finally:
                     event.set()
 
-            async = Async(current_app.loop, inner_callback)
-            async.send()
+            self._spinner.start(lambda h: h.stop())
+            self._dispatcher.start(inner_callback)
+            current_app.loop_container.wakeup()
             try:
                 if not event.wait(self.__timeout):
                     raise Exception('Timeout happened when calling method'
                                     ' {0!r} of {1!r}'.format(self.__name__, obj))
             finally:
                 event.clear()
-                if not async.closed:
-                    async.close()
 
             result, tb = d['result'], d['tb']
             if isinstance(result, Exception):
