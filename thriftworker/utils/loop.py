@@ -4,11 +4,9 @@ from __future__ import absolute_import
 import sys
 from functools import wraps
 
-from pyuv import Prepare, Idle
+from pyuv import Async
 
 from thriftworker.state import current_app
-
-from .decorators import cached_property
 
 
 class in_loop(object):
@@ -23,39 +21,25 @@ class in_loop(object):
         self.__doc__ = func.__doc__
         self.__timeout = timeout or 5.0
 
-    @cached_property
-    def _spinner(self):
-        return Idle(current_app.loop)
-
-    @cached_property
-    def _dispatcher(self):
-        return Prepare(current_app.loop)
-
-    @cached_property
-    def _is_done(self):
-        return current_app.env.RealEvent()
-
     def __create(self, obj):
         method = self.__func.__get__(obj)
 
         @wraps(self.__func)
         def inner_decorator(*args, **kwargs):
-            event = self._is_done
-            d = {'result': None, 'tb': None}
+            event = current_app.env.RealEvent()
+            d = {'result': None, 'exception': None}
 
             def inner_callback(handle):
-                handle.stop()
+                handle.close()
                 try:
                     d['result'] = method(*args, **kwargs)
-                except Exception as exc:
-                    # Save traceback here.
-                    d['result'] = exc
-                    d['tb'] = sys.exc_info()[2]
+                except:
+                    d['exception'] = sys.exc_info()
                 finally:
                     event.set()
 
-            self._spinner.start(lambda h: h.stop())
-            self._dispatcher.start(inner_callback)
+            handle = Async(current_app.loop, inner_callback)
+            handle.send()
             current_app.loop_container.wakeup()
             try:
                 if not event.wait(self.__timeout):
@@ -63,13 +47,14 @@ class in_loop(object):
                                     ' {0!r} of {1!r}'.format(self.__name__, obj))
             finally:
                 event.clear()
+                if handle.active:
+                    handle.close()
 
-            result, tb = d['result'], d['tb']
-            if isinstance(result, Exception):
-                # Restore traceback.
-                raise result.__class__, result, tb
+            if d['exception'] is not None:
+                exc_type, exc, tb = d['exception']
+                raise exc_type, exc, tb
             else:
-                return result
+                return d['result']
 
         try:
             ident = current_app.loop.ident
