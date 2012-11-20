@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractproperty
 
 from thriftworker.utils.imports import get_real_module
 from thriftworker.utils.decorators import cached_property
@@ -54,4 +54,8 @@ class BaseEnv(object):
 
     @abstractproperty
     def Event(self):
+        raise NotImplementedError()
+
+    @abstractproperty
+    def RLock(self):
         raise NotImplementedError()
