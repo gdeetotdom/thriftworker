@@ -110,6 +110,7 @@ cdef class Connection:
         # Close socket.
         self.status = CLOSED
         self.client.close()
+        self.sock.close()
 
         # Execute callback.
         self.on_close(self)

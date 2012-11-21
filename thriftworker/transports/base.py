@@ -100,14 +100,15 @@ class BaseAcceptor(LoopMixin):
         def on_close(connection):
             connections.remove(connection)
 
-        def on_connection(poll_handle, events, error):
+        def on_connection(handle, events, error):
             if error:
                 logger.error('Error handling new connection for service %r: %s',
                              service, strerror(error))
                 return
             with maybe_block(), ignore_eagain():
                 sock, addr = listen_sock.accept()
-                client = Pipe(loop)
+                client = TCP(loop)
+                client.nodelay(True)
                 client.open(sock.fileno())
                 connection = self.Connection(producer, loop, client, sock, on_close)
                 connections.register(connection)
