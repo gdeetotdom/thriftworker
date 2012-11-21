@@ -11,6 +11,7 @@ from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
 from . import constants
+from .transports.base import Acceptors
 from .state import set_current_app, get_current_app
 from .listener import Listener
 from .loop import LoopContainer
@@ -106,6 +107,10 @@ class ThriftWorker(SubclassMixin):
     @cached_property
     def Acceptor(self):
         return self.subclass_with_self(self.acceptor_cls, reverse='Acceptor')
+
+    @cached_property
+    def Acceptors(self):
+        return self.subclass_with_self(Acceptors)
 
     @property
     def worker_cls(self):

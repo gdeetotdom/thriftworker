@@ -1,9 +1,11 @@
 from __future__ import absolute_import
 
-from abc import ABCMeta, abstractproperty
+from abc import ABCMeta, abstractproperty, abstractmethod
 
 from thriftworker.utils.imports import get_real_module
 from thriftworker.utils.decorators import cached_property
+
+from .mutex import Mutex
 
 
 class BaseEnv(object):
@@ -17,6 +19,10 @@ class BaseEnv(object):
     @cached_property
     def _time(self):
         return get_real_module('time')
+
+    @cached_property
+    def socket(self):
+        return get_real_module('socket')
 
     @cached_property
     def _threading(self):
@@ -59,3 +65,11 @@ class BaseEnv(object):
     @abstractproperty
     def RLock(self):
         raise NotImplementedError()
+
+    @abstractmethod
+    def start_thread(self, func, args=None, kwargs=None):
+        raise NotImplementedError()
+
+    @property
+    def Mutex(self):
+        return Mutex

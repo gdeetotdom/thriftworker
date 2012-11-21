@@ -22,8 +22,8 @@ cdef class Connection:
     # Given arguments.
     cdef object producer
     cdef object client
-    cdef object peername
     cdef object loop
+    cdef object sock
     cdef object on_close
 
     cdef inline bint is_writeable(self)

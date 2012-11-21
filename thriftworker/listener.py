@@ -34,7 +34,9 @@ class Listener(LoopMixin):
     @cached_property
     def socket(self):
         """A shortcut to create a TCP socket and bind it."""
-        return socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return sock
 
     @cached_property
     def channel(self):

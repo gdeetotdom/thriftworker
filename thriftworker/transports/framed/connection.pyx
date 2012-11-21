@@ -26,7 +26,7 @@ cdef class Connection:
     """
 
     def __init__(self, object producer, object loop, object client,
-                 object on_close):
+                 object sock, object on_close):
         # Default values.
         self.recv_bytes = self.message_length = 0
         self.status = WAIT_LEN
@@ -38,10 +38,10 @@ cdef class Connection:
         self.producer = producer
         self.loop = loop
         self.client = client
+        self.sock = sock
         self.on_close = on_close
 
         # Start watchers.
-        self.peername = '{0[0]}:{0[1]}'.format(self.client.getpeername())
         self.client.start_read(self.cb_read_done)
 
     @cython.profile(False)
@@ -146,12 +146,12 @@ cdef class Connection:
             self.client.write(data, self.cb_write_done)
 
     cdef inline void handle_error(self, object error):
-        logger.error('Error with client %r: %s',
-                     self.peername, strerror(error))
+        logger.error('Error: %s', strerror(error))
 
     cpdef cb_read_done(self, object handle, object data, object error):
         if error:
-            self.handle_error(error)
+            if error != UV_EOF:
+                self.handle_error(error)
             self.close()
             return
 
