@@ -32,6 +32,11 @@ class Listener(LoopMixin):
         super(Listener, self).__init__()
 
     @cached_property
+    def accept_mutex(self):
+        """Mutex to prevent simultaneous accepts."""
+        return self.app.env.Mutex()
+
+    @cached_property
     def socket(self):
         """A shortcut to create a TCP socket and bind it."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -40,6 +45,10 @@ class Listener(LoopMixin):
 
     @cached_property
     def channel(self):
+        """Wrapper for socket. Needed to pass descriptor
+        to child process.
+
+        """
         pipe = Pipe(self.loop)
         pipe.open(self.socket.fileno())
         return pipe
@@ -56,6 +65,7 @@ class Listener(LoopMixin):
 
     @in_loop
     def start(self):
+        """Bind listener to given port."""
         binded = False
         sock = self.socket
         for address in get_addresses_from_pool(self.name, self.address,
@@ -78,3 +88,39 @@ class Listener(LoopMixin):
     def stop(self):
         if not self.channel.closed:
             self.channel.close()
+        self.socket.close()
+
+
+class Listeners(LoopMixin):
+    """Maintain pool of listeners."""
+
+    def __init__(self):
+        self._listeners = []
+        super(Listeners, self).__init__()
+
+    def __iter__(self):
+        return iter(self._listeners)
+
+    @cached_property
+    def Listener(self):
+        """Shortcut to :class:`thriftworker.listener.Listener` class."""
+        return self.app.Listener
+
+    @cached_property
+    def channels(self):
+        """Return list of registered channels. Useful to pass them
+        to child process.
+
+        """
+        return [listener.channel for listener in self._listeners]
+
+    @cached_property
+    def enumerated(self):
+        """Return enumerated mapping of listeners."""
+        return {i: listener for i, listener in enumerate(self._listeners)}
+
+    def register(self, name, host, port, backlog=None):
+        """Register new listener with given parameters."""
+        listener = self.Listener(name, (host, port), backlog=backlog)
+        self._listeners.append(listener)
+        del self.channels, self.enumerated

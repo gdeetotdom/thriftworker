@@ -13,7 +13,7 @@ from thrift.protocol import TBinaryProtocol
 from . import constants
 from .transports.base import Acceptors
 from .state import set_current_app, get_current_app
-from .listener import Listener
+from .listener import Listener, Listeners
 from .loop import LoopContainer
 from .services import Services
 from .utils.decorators import cached_property
@@ -105,12 +105,27 @@ class ThriftWorker(SubclassMixin):
         return self.subclass_with_self(Listener)
 
     @cached_property
+    def Listeners(self):
+        """Create bounded :class:`Listeners` class."""
+        return self.subclass_with_self(Listeners)
+
+    @cached_property
+    def listeners(self):
+        """Create pool of listeners."""
+        return self.Listeners()
+
+    @cached_property
     def Acceptor(self):
         return self.subclass_with_self(self.acceptor_cls, reverse='Acceptor')
 
     @cached_property
     def Acceptors(self):
         return self.subclass_with_self(Acceptors)
+
+    @cached_property
+    def acceptors(self):
+        """Create pool of acceptors."""
+        return self.Acceptors()
 
     @property
     def worker_cls(self):
@@ -131,6 +146,6 @@ class ThriftWorker(SubclassMixin):
 
     @cached_property
     def worker(self):
-        """Create pool."""
+        """Create some worker routine."""
         logger.debug('Using {0!r} worker'.format(self.Worker))
         return self.Worker()
