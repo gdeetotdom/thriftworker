@@ -1,13 +1,12 @@
 from __future__ import absolute_import
 
-import os
 import errno
 import logging
 from contextlib import contextmanager
 from collections import deque
 from abc import ABCMeta, abstractproperty
 
-from pyuv import TCP, Async, Pipe, Poll, UV_READABLE
+from pyuv import Async, Pipe, Poll, UV_READABLE
 from pyuv.errno import strerror
 
 from thriftworker.constants import BACKLOG_SIZE
@@ -107,8 +106,7 @@ class BaseAcceptor(LoopMixin):
                 return
             with maybe_block(), ignore_eagain():
                 sock, addr = listen_sock.accept()
-                client = TCP(loop)
-                client.nodelay(True)
+                client = Pipe(loop)
                 client.open(sock.fileno())
                 connection = self.Connection(producer, loop, client, sock, on_close)
                 connections.register(connection)
