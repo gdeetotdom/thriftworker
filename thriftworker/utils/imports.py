@@ -74,6 +74,8 @@ def instantiate(name, *args, **kwargs):
 
 
 def qualname(obj):
+    if isinstance(obj, basestring):
+        return obj
     if not hasattr(obj, '__name__') and hasattr(obj, '__class__'):
         return qualname(obj.__class__)
     return '.'.join([obj.__module__, obj.__name__])

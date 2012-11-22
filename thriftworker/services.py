@@ -27,9 +27,6 @@ class Services(object):
     def register(self, service_name, processor, proto_factory=None):
         """Register new processor for given service."""
         service = self.Service(processor, proto_factory or self.proto_factory)
-        if service_name in self.services:
-            raise ServiceAlreadyRegistered('Service {0} already registered'
-                                           .format(service_name))
         self.services[service_name] = service
 
     def create_processor(self, service_name):
