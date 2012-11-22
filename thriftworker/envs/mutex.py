@@ -18,6 +18,7 @@ try:
 except AttributeError:
     sem_unlink = None
 
+from thriftworker.utils.finalize import Finalize
 from thriftworker.utils.decorators import cached_property
 
 __all__ = ['Mutex']
@@ -27,26 +28,22 @@ class Mutex(object):
     _counter = itertools.count()
 
     def __init__(self):
-        if not semaphore_exists:
-            raise RuntimeError('SemLock not avalaible!')
+        self._finalize = None
+        super(Mutex, self).__init__()
 
     @cached_property
     def _semlock(self):
+        if not semaphore_exists:
+            raise RuntimeError('SemLock not available!')
         kind, value, maxvalue = 1, 1, 1
         if sem_unlink:
             sl = SemLock(kind, value, maxvalue,
                          self._make_name(), False)
+            self._finalize = Finalize(self, sem_unlink, (sl.name,),
+                                      exitpriority=0)
         else:
             sl = SemLock(kind, value, maxvalue)
         return sl
-
-    @property
-    def value(self):
-        return self._semlock._get_value()
-
-    def __del__(self):
-        if sem_unlink is not None and '_semlock' in vars(self):
-            sem_unlink(self._semlock.name)
 
     def __enter__(self):
         return self._semlock.__enter__()
