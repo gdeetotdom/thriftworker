@@ -39,7 +39,7 @@ class Worker(Thread):
             if task is None:
                 shutdown()
                 break
-            exception = None
+            result, exception = None, None
             processor, request, callback = task
             try:
                 result = processor(request.data)
