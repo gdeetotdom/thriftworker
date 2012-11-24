@@ -8,6 +8,7 @@ from .base import BaseEnv
 
 
 class GeventEnv(BaseEnv):
+    """Implementation of gevent-compatible environment."""
 
     @property
     def Event(self):

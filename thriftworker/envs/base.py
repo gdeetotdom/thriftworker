@@ -9,6 +9,10 @@ from .mutex import Mutex
 
 
 class BaseEnv(object):
+    """Provided methods and property that should be used to work properly with
+    current environment, for example, monkey patched Python stdlib by gevent.
+
+    """
 
     __metaclass__ = ABCMeta
 

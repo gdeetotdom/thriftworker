@@ -25,6 +25,11 @@ __all__ = ['Mutex']
 
 
 class Mutex(object):
+    """System-wide mutex. Based on :class:`billiard.synchronize.SemLock`.
+    Support lazy initialization. Could be pickled.
+
+    """
+
     _counter = itertools.count()
 
     def __init__(self):

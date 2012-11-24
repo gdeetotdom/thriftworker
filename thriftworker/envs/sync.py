@@ -7,6 +7,7 @@ from .base import BaseEnv
 
 
 class SyncEnv(BaseEnv):
+    """Default CPython environment."""
 
     @property
     def Event(self):
