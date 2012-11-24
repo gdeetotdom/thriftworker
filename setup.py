@@ -164,6 +164,12 @@ try:
 finally:
     meta_fh.close()
 
+with open(os.path.join(here, 'README.rst')) as f:
+    README = f.read()
+
+with open(os.path.join(here, 'CHANGES.rst')) as f:
+    CHANGES = f.read()
+
 
 #-----------------------------------------------------------------------------
 # Setup
@@ -176,6 +182,8 @@ setup(
     author=meta['author'],
     author_email=meta['contact'],
     url=meta['homepage'],
+    long_description=README + '\n\n' + CHANGES,
+    keywords='thrift soa',
     license='BSD',
     cmdclass=cmdclass,
     ext_modules=extensions,

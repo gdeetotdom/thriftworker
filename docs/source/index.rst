@@ -4,10 +4,10 @@
    contain the root `toctree` directive.
 
 thriftworker
-==========
+============
 
 Listen tcp socket, parse Thrift framed protocol and distribute message between
-workers using ZeroMQ.
+workers.
 
 
 Reference Docs
@@ -16,11 +16,8 @@ Reference Docs
 .. toctree::
    :maxdepth: 1
 
-   install
-   basic_usage
-   implementation
-   api
-
+   API <api>
+   Changelog <changelog>
 
 Indices and tables
 ==================

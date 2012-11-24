@@ -17,6 +17,14 @@ utils Package
     :undoc-members:
     :show-inheritance:
 
+:mod:`finalize` Module
+----------------------
+
+.. automodule:: thriftworker.utils.finalize
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :mod:`imports` Module
 ---------------------
 

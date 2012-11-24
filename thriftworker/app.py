@@ -53,7 +53,7 @@ class ThriftWorker(SubclassMixin):
     @cached_property
     def loop(self):
         """Create event loop. Should be running in separate thread."""
-        return Loop()
+        return Loop.default_loop()
 
     @cached_property
     def LoopContainer(self):

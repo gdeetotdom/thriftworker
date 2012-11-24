@@ -8,6 +8,7 @@ from pyuv.error import HandleError
 
 from .utils.loop import in_loop
 from .utils.mixin import LoopMixin
+from .utils.decorators import cached_property
 
 __all__ = ['LoopContainer']
 
@@ -21,8 +22,14 @@ class LoopContainer(LoopMixin):
 
     def __init__(self):
         self._guard = None
-        self._started = self.app.env.RealEvent()
-        self._stopped = self.app.env.RealEvent()
+
+    @cached_property
+    def _started(self):
+        return self.app.env.RealEvent()
+
+    @cached_property
+    def _stopped(self):
+        return self.app.env.RealEvent()
 
     def wakeup(self):
         assert self._guard is not None, 'loop not started'
