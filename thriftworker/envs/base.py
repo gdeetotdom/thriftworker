@@ -44,7 +44,8 @@ class BaseEnv(object):
 
     def start_real_thread(self, func, args=None, kwargs=None):
         """Start new OS thread regardless of any monkey patching."""
-        return self._thread.start_new_thread(func, tuple(args or []), kwargs or {})
+        return self._thread.start_new_thread(func, tuple(args or []),
+                                             kwargs or {})
 
     def get_real_ident(self):
         """Get identification of current thread regardless of any monkey

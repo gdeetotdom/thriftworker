@@ -6,7 +6,7 @@ import importlib
 
 
 def symbol_by_name(name, aliases={}, imp=None, package=None,
-        sep='.', default=None, **kwargs):
+                   sep='.', default=None, **kwargs):
     """Get symbol by qualified name.
 
     The name should be the full dot-separated path to the class::
@@ -55,8 +55,8 @@ def symbol_by_name(name, aliases={}, imp=None, package=None,
         try:
             module = imp(module_name, package=package, **kwargs)
         except ValueError, exc:
-            raise ValueError, ValueError(
-                    "Couldn't import %r: %s" % (name, exc)), sys.exc_info()[2]
+            exc = ValueError("Couldn't import %r: %s" % (name, exc))
+            raise ValueError, exc, sys.exc_info()[2]
         return getattr(module, cls_name) if cls_name else module
     except (ImportError, AttributeError):
         if default is None:

@@ -44,7 +44,8 @@ class in_loop(object):
             try:
                 if not event.wait(self.__timeout):
                     raise Exception('Timeout happened when calling method'
-                                    ' {0!r} of {1!r}'.format(self.__name__, obj))
+                                    ' {0!r} of {1!r}'
+                                    .format(self.__name__, obj))
             finally:
                 event.clear()
                 if handle.active:

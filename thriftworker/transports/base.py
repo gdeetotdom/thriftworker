@@ -17,7 +17,6 @@ from thriftworker.utils.decorators import cached_property
 logger = logging.getLogger(__name__)
 
 
-
 @contextmanager
 def ignore_eagain(socket):
     """Ignore all *EAGAIN* errors in context."""
@@ -84,7 +83,8 @@ class BaseAcceptor(LoopMixin):
     @cached_property
     def _socket(self):
         socket = self.app.env.socket
-        sock = socket.fromfd(self.descriptor, socket.AF_INET, socket.SOCK_STREAM)
+        sock = socket.fromfd(self.descriptor, socket.AF_INET,
+                             socket.SOCK_STREAM)
         sock.setblocking(0)
         return sock
 
@@ -113,8 +113,8 @@ class BaseAcceptor(LoopMixin):
         def accept_connection(handle, events, error):
             """Function that try to accept new connection."""
             if error:
-                logger.error('Error handling new connection for service %r: %s',
-                             service, strerror(error))
+                logger.error('Error handling new connection for'
+                             ' service %r: %s', service, strerror(error))
                 return
             with maybe_block(mutex), ignore_eagain(socket):
                 sock, addr = listen_sock.accept()
@@ -122,7 +122,8 @@ class BaseAcceptor(LoopMixin):
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 client = Pipe(loop)
                 client.open(sock.fileno())
-                connection = self.Connection(producer, loop, client, sock, on_close)
+                connection = self.Connection(producer, loop, client, sock,
+                                             on_close)
                 connections.register(connection)
 
         return accept_connection
