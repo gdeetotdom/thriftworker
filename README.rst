@@ -11,5 +11,5 @@ Key features:
 * Support multiple workers implementation (gevent, sync, threads pool);
 * Support multiple transports (currenlty only framed transport over tcp).
 
-.. |cistatus| image:: https://secure.travis-ci.org/blackwithwhite666/thriftworker.png?branch=master
+.. |cistatus| image:: https://secure.travis-ci.org/gdeetotdom/thriftworker.png?branch=master
 .. _`ThriftPool`: https://github.com/blackwithwhite666/thriftpool
