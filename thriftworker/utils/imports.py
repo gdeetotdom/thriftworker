@@ -1,8 +1,10 @@
 from __future__ import absolute_import
 
+import os
 import sys
 import imp
 import importlib
+from contextlib import contextmanager
 
 
 def symbol_by_name(name, aliases={}, imp=None, package=None,
@@ -91,3 +93,32 @@ def get_real_module(name):
     finally:
         if fp:
             fp.close()
+
+
+@contextmanager
+def cwd_in_path():
+    cwd = os.getcwd()
+    if cwd in sys.path:
+        yield
+    else:
+        sys.path.insert(0, cwd)
+        try:
+            yield cwd
+        finally:
+            try:
+                sys.path.remove(cwd)
+            except ValueError:  # pragma: no cover
+                pass
+
+
+def import_from_cwd(module, imp=None, package=None):
+    """Import module, but make sure it finds modules
+    located in the current directory.
+
+    Modules located in the current directory has
+    precedence over modules located in `sys.path`.
+    """
+    if imp is None:
+        imp = importlib.import_module
+    with cwd_in_path():
+        return imp(module, package=package)
