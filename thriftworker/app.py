@@ -39,11 +39,40 @@ class ThriftWorker(SubclassMixin):
         if protocol_factory is not None:
             self.protocol_factory = protocol_factory
         self.port_range = port_range
-        if pool_size is not None and pool_size < 0:
-            raise ValueError('Pool size can not be negative.')
-        self.pool_size = pool_size or 1
+        self.pool_size = pool_size
         super(ThriftWorker, self).__init__()
         set_current_app(self)
+
+    @cached_property
+    def pool_size(self):
+        """Return default pool size."""
+        return 1
+
+    @pool_size.setter
+    def pool_size(self, value):
+        if value is not None and value < 0:
+            raise ValueError('Pool size can not be negative.')
+        return int(value or 1) or 1
+
+    @cached_property
+    def port_range(self):
+        """Return range from which we allowed to allocate ports."""
+        return None
+
+    @port_range.setter
+    def port_range(self, value):
+        if value is None:
+            return None
+        try:
+            start, stop = int(value[0]), int(value[1])
+        except (IndexError, ValueError):
+            raise ValueError('Port range must be tuple of two integers.')
+        return (start, stop)
+
+    @cached_property
+    def protocol_factory(self):
+        """Specify which protocol should be used."""
+        return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
     @staticmethod
     def instance():
@@ -64,11 +93,6 @@ class ThriftWorker(SubclassMixin):
     def loop_container(self):
         """Instance of bounded :class:`LoopContainer`."""
         return self.LoopContainer()
-
-    @cached_property
-    def protocol_factory(self):
-        """Specify which protocol should be used."""
-        return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
     @property
     def env_cls(self):
