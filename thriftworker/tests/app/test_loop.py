@@ -1,29 +1,17 @@
 from __future__ import absolute_import
 
-from contextlib import contextmanager
-
-from pyuv import Loop
-
-from thriftworker.tests.utils import TestCase
-from thriftworker.app import ThriftWorker
+from thriftworker.tests.utils import TestCase, CustomAppMixin, start_stop_ctx
 
 
-class TestLoopContainer(TestCase):
+class TestLoopContainer(CustomAppMixin, TestCase):
 
     def setUp(self):
         super(TestLoopContainer, self).setUp()
-        loop = self.loop = Loop()
-        app = self.app = ThriftWorker(loop=loop)
-        self.container = app.loop_container
+        self.container = self.app.loop_container
 
-    @contextmanager
     def context(self):
         container = self.container
-        container.start()
-        try:
-            yield container
-        finally:
-            container.stop()
+        return start_stop_ctx(container)
 
     def test_start_stop(self):
         loop = self.loop

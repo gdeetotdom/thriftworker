@@ -74,6 +74,15 @@ class ThriftWorker(SubclassMixin):
         """Specify which protocol should be used."""
         return TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
+    @classmethod
+    def default(cls):
+        """Return default application instance."""
+        try:
+            app = cls.instance()
+        except RuntimeError:
+            app = cls()
+        return app
+
     @staticmethod
     def instance():
         """Return global instance."""

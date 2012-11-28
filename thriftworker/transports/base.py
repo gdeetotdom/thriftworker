@@ -43,6 +43,9 @@ class Connections(object):
     def __init__(self):
         self.connections = set()
 
+    def __len__(self):
+        return len(self.connections)
+
     def register(self, connection):
         """Register new connection."""
         self.connections.add(connection)
@@ -55,8 +58,9 @@ class Connections(object):
             logger.warning('Connection %r not registered', connection)
 
     def close(self):
-        while self.connections:
-            connection = self.connections.pop()
+        connections = self.connections
+        while connections:
+            connection = connections.pop()
             if not connection.is_closed():
                 connection.close()
 
@@ -96,6 +100,11 @@ class BaseAcceptor(LoopMixin):
         """
         raise NotImplementedError()
 
+    @property
+    def connections_number(self):
+        """Return number of active connections."""
+        return len(self._connections)
+
     def create_acceptor(self):
         """Return function that should accept new connections."""
         loop = self.loop
@@ -128,9 +137,11 @@ class BaseAcceptor(LoopMixin):
 
         return accept_connection
 
+    @in_loop
     def start(self):
         self._poller.start(UV_READABLE, self.create_acceptor())
 
+    @in_loop
     def stop(self):
         self._poller.close()
         self._connections.close()
