@@ -16,10 +16,10 @@ class TestInLoop(StartStopLoopMixin, TestCase):
         class Entity(object):
 
             @in_loop
-            def some_method(self):
-                return mock(None)
+            def some_method(self, arg):
+                return mock(arg)
 
-        Entity().some_method()
+        Entity().some_method(None)
         mock.assert_called_once_with(None)
 
     def test_inside_loop(self):
@@ -40,6 +40,20 @@ class TestInLoop(StartStopLoopMixin, TestCase):
 
         self.wakeup_loop()
         mock.assert_called_once_with(async)
+
+    def test_exception(self):
+
+        class CustomException(Exception):
+            pass
+
+        class Entity(object):
+
+            @in_loop
+            def some_method(self):
+                raise CustomException()
+
+        with self.assertRaises(CustomException):
+            Entity().some_method()
 
 
 class TestOutsideLoop(CustomAppMixin, TestCase):
