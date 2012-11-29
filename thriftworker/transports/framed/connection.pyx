@@ -101,7 +101,7 @@ cdef class Connection:
             self.message_buffer.write(incoming_buffer)
 
         self.recv_bytes += received
-        if self.recv_bytes == self.message_length:
+        if self.recv_bytes >= self.message_length:
             self.recv_bytes = 0
             self.status = WAIT_PROCESS
 
