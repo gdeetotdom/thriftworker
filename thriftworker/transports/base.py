@@ -27,16 +27,6 @@ def ignore_eagain(socket):
             raise
 
 
-@contextmanager
-def maybe_block(mutex=None):
-    """Try to acquire mutex if it exists."""
-    if mutex is None:
-        yield
-    else:
-        with mutex:
-            yield
-
-
 class Connections(object):
     """Store connections."""
 
@@ -71,11 +61,9 @@ class BaseAcceptor(LoopMixin):
 
     Connections = Connections
 
-    def __init__(self, name, descriptor, backlog=None,
-                 mutex=None):
+    def __init__(self, name, descriptor, backlog=None):
         self.name = name
         self.descriptor = descriptor
-        self.mutex = mutex
         self.backlog = backlog or BACKLOG_SIZE
         self._connections = self.Connections()
         super(BaseAcceptor, self).__init__()
@@ -113,7 +101,6 @@ class BaseAcceptor(LoopMixin):
         producer = self.app.worker.create_producer(service)
         socket = self.app.env.socket
         listen_sock = self._socket
-        mutex = self.mutex
 
         def on_close(connection):
             """Callback called when connection closed."""
@@ -125,7 +112,7 @@ class BaseAcceptor(LoopMixin):
                 logger.error('Error handling new connection for'
                              ' service %r: %s', service, strerror(error))
                 return
-            with maybe_block(mutex), ignore_eagain(socket):
+            with ignore_eagain(socket):
                 sock, addr = listen_sock.accept()
                 # Disable Nagle's algorithm for socket.
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -177,10 +164,9 @@ class Acceptors(LoopMixin):
 
         return Async(self.loop, cb)
 
-    def register(self, fd, name, mutex=None, backlog=None):
+    def register(self, fd, name, backlog=None):
         """Register new acceptor in pool."""
-        acceptor = self.Acceptor(name, fd, backlog=backlog,
-                                 mutex=mutex)
+        acceptor = self.Acceptor(name, fd, backlog=backlog)
         self._acceptors.add(acceptor)
         self._outgoing.append(acceptor.start)
         self._handle.send()

@@ -76,16 +76,3 @@ class TestAcceptor(StartStopLoopMixin, TestCase):
             client.send(payload)
             self.assertEqual(payload, client.recv(4))
         self.assertEqual(0, acceptor.connections_number)
-
-    def test_mutex(self):
-        source = socket.socket()
-        mutex = Mock()
-        mutex.__enter__ = Mock(return_value=None)
-        mutex.__exit__ = Mock(return_value=None)
-        acceptor = self.Acceptor(name=self.service_name,
-                                 descriptor=source.fileno(),
-                                 mutex=mutex)
-        with self.maybe_connect(source, acceptor) as client:
-            client.send(b'xxxx')
-        mutex.__enter__.assert_called_once_with()
-        mutex.__exit__.assert_called_once_with(None, None, None)
