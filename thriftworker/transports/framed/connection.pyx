@@ -72,7 +72,9 @@ cdef class Connection:
     cdef inline read(self):
         """Reads data from stream and switch state."""
         assert self.is_readable(), 'socket in non-readable state'
-        received = len(self.incoming_buffer)
+        incoming_buffer = self.incoming_buffer
+        received = len(incoming_buffer)
+        self.incoming_buffer = ''
 
         if received == 0:
             # if we read 0 bytes and message is empty, it means client
@@ -83,7 +85,7 @@ cdef class Connection:
         if self.status == WAIT_LEN:
             assert received > LENGTH_SIZE, "message length can't be read"
 
-            view = buffer(self.incoming_buffer)
+            view = buffer(incoming_buffer)
             message_length = self.struct.unpack_from(view[0:LENGTH_SIZE])[0]
             assert message_length > 0, "negative or empty frame size, it seems" \
                                        " client doesn't use FramedTransport"
@@ -96,7 +98,7 @@ cdef class Connection:
 
         elif self.status == WAIT_MESSAGE:
             # Simply write data to buffer.
-            self.message_buffer.write(self.incoming_buffer)
+            self.message_buffer.write(incoming_buffer)
 
         self.recv_bytes += received
         if self.recv_bytes == self.message_length:
@@ -158,7 +160,7 @@ cdef class Connection:
 
         try:
             self.incoming_buffer = data or ''
-            while self.is_readable():
+            if self.is_readable():
                 # Try to read whole message to buffer while we can.
                 self.read()
 

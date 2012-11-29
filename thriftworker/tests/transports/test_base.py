@@ -1,12 +1,11 @@
 from __future__ import absolute_import
 
 import socket
-from contextlib import closing, contextmanager
-from mock import Mock
 
-from thriftworker.tests.utils import TestCase, StartStopLoopMixin, \
-    start_stop_ctx
+from thriftworker.tests.utils import TestCase
 from thriftworker.transports.base import BaseAcceptor
+
+from .utils import AcceptorMixin
 
 
 class EchoConnection(object):
@@ -46,25 +45,9 @@ class Acceptor(BaseAcceptor):
     Connection = EchoConnection
 
 
-class TestAcceptor(StartStopLoopMixin, TestCase):
+class TestBaseAcceptor(AcceptorMixin, TestCase):
 
-    def setUp(self):
-        super(TestAcceptor, self).setUp()
-        self.Acceptor = self.app.subclass_with_self(Acceptor)
-        service_name = self.service_name = 'SomeService'
-        processor = self.processor = Mock()
-        self.app.services.register(service_name, processor)
-
-    @contextmanager
-    def maybe_connect(self, source, acceptor):
-        client = socket.socket()
-        source.bind(('localhost', 0))
-        source.listen(0)
-        with closing(source), closing(client), start_stop_ctx(acceptor):
-            client.settimeout(1.0)
-            client.connect(source.getsockname())
-            self.wakeup_loop()
-            yield client
+    Acceptor = Acceptor
 
     def test_connection(self):
         source = socket.socket()
