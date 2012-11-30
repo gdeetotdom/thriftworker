@@ -188,7 +188,7 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     packages=find_packages(),
-    install_requires=['pyuv', 'thrift', 'six', 'billiard'],
+    install_requires=['pyuv', 'thrift', 'six'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
                  "Intended Audience :: System Administrators",

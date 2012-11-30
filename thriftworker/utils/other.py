@@ -27,25 +27,25 @@ def get_port_from_range(name, range_start, range_end):
     return hashed_port + range_start
 
 
-def get_addresses_from_pool(name, address, port_range):
+def get_addresses_from_pool(name, address, port_range=None):
     """Get addresses from pool."""
     host, port = address
     if isinstance(port, int):
         ports = (port or 0,)
     elif isinstance(port, basestring) or port is None:
-        if port_range is None and port is not None:
-            raise ValueError('Port range not specified')
-        elif port == 'random':
+        if port and port.isdigit():
+            ports = (int(port),)
+        elif port == 'random' or (port is None and port_range is None):
             ports = (0,)
+        elif port_range is None and port:
+            raise ValueError('Port range not specified')
         elif port is None or port == 'pool':
             range_start, range_end = port_range[0], port_range[1]
             default_port = get_port_from_range(name, range_start, range_end)
             chains = [(default_port,),
-                      xrange(default_port, range_end),
+                      xrange(default_port + 1, range_end),
                       xrange(range_start, default_port)]
             ports = itertools.chain.from_iterable(chains)
-        elif port.isdigit():
-            ports = (int(port),)
         else:
             raise ValueError('Unknown port {0!r}'.format(port))
     else:
