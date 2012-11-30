@@ -36,7 +36,7 @@ class LoopContainer(LoopMixin):
         try:
             self._guard.send()
         except HandleError:
-            pass
+            pass  # pragma: no cover
 
     def _run(self):
         """Run event loop."""
@@ -62,6 +62,10 @@ class LoopContainer(LoopMixin):
 
     def start(self):
         """Start event loop in separate thread."""
+        assert self._guard is None
+        # Cleanup events.
+        self._started.clear()
+        self._stopped.clear()
         # Prevent loop exit.
         async = self._guard = Async(self.loop, lambda h: None)
         async.send()
@@ -71,8 +75,10 @@ class LoopContainer(LoopMixin):
 
     def stop(self):
         """Stop event loop and wait until it exit."""
+        assert self._guard is not None
         self.wakeup()
         self._close_handlers()
         if self._guard.active:
             self._guard.close()
+        self._guard = None
         self._stopped.wait()

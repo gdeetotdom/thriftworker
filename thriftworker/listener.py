@@ -32,11 +32,6 @@ class Listener(LoopMixin):
         super(Listener, self).__init__()
 
     @cached_property
-    def accept_mutex(self):
-        """Mutex to prevent simultaneous accepts."""
-        return self.app.env.Mutex()
-
-    @cached_property
     def socket(self):
         """A shortcut to create a TCP socket and bind it."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

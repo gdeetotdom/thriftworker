@@ -27,21 +27,14 @@ def ignore_eagain(socket):
             raise
 
 
-@contextmanager
-def maybe_block(mutex=None):
-    """Try to acquire mutex if it exists."""
-    if mutex is None:
-        yield
-    else:
-        with mutex:
-            yield
-
-
 class Connections(object):
     """Store connections."""
 
     def __init__(self):
         self.connections = set()
+
+    def __len__(self):
+        return len(self.connections)
 
     def register(self, connection):
         """Register new connection."""
@@ -55,8 +48,9 @@ class Connections(object):
             logger.warning('Connection %r not registered', connection)
 
     def close(self):
-        while self.connections:
-            connection = self.connections.pop()
+        connections = self.connections
+        while connections:
+            connection = connections.pop()
             if not connection.is_closed():
                 connection.close()
 
@@ -67,11 +61,9 @@ class BaseAcceptor(LoopMixin):
 
     Connections = Connections
 
-    def __init__(self, name, descriptor, backlog=None,
-                 mutex=None):
+    def __init__(self, name, descriptor, backlog=None):
         self.name = name
         self.descriptor = descriptor
-        self.mutex = mutex
         self.backlog = backlog or BACKLOG_SIZE
         self._connections = self.Connections()
         super(BaseAcceptor, self).__init__()
@@ -96,6 +88,11 @@ class BaseAcceptor(LoopMixin):
         """
         raise NotImplementedError()
 
+    @property
+    def connections_number(self):
+        """Return number of active connections."""
+        return len(self._connections)
+
     def create_acceptor(self):
         """Return function that should accept new connections."""
         loop = self.loop
@@ -104,7 +101,6 @@ class BaseAcceptor(LoopMixin):
         producer = self.app.worker.create_producer(service)
         socket = self.app.env.socket
         listen_sock = self._socket
-        mutex = self.mutex
 
         def on_close(connection):
             """Callback called when connection closed."""
@@ -116,7 +112,7 @@ class BaseAcceptor(LoopMixin):
                 logger.error('Error handling new connection for'
                              ' service %r: %s', service, strerror(error))
                 return
-            with maybe_block(mutex), ignore_eagain(socket):
+            with ignore_eagain(socket):
                 sock, addr = listen_sock.accept()
                 # Disable Nagle's algorithm for socket.
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -128,9 +124,11 @@ class BaseAcceptor(LoopMixin):
 
         return accept_connection
 
+    @in_loop
     def start(self):
         self._poller.start(UV_READABLE, self.create_acceptor())
 
+    @in_loop
     def stop(self):
         self._poller.close()
         self._connections.close()
@@ -166,10 +164,9 @@ class Acceptors(LoopMixin):
 
         return Async(self.loop, cb)
 
-    def register(self, fd, name, mutex=None, backlog=None):
+    def register(self, fd, name, backlog=None):
         """Register new acceptor in pool."""
-        acceptor = self.Acceptor(name, fd, backlog=backlog,
-                                 mutex=mutex)
+        acceptor = self.Acceptor(name, fd, backlog=backlog)
         self._acceptors.add(acceptor)
         self._outgoing.append(acceptor.start)
         self._handle.send()

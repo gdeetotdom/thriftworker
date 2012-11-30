@@ -2,8 +2,6 @@ from __future__ import absolute_import
 
 from abc import ABCMeta, abstractproperty, abstractmethod
 
-from .mutex import Mutex
-
 
 class BaseEnv(object):
     """Provided methods and property that should be used to work properly with
@@ -40,7 +38,3 @@ class BaseEnv(object):
     @abstractmethod
     def start_thread(self, func, args=None, kwargs=None):
         raise NotImplementedError()
-
-    @property
-    def Mutex(self):
-        return Mutex

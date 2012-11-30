@@ -180,3 +180,10 @@ class PromiseProxy(Proxy):
             object.__delattr__(self, '_Proxy__local')
             object.__delattr__(self, '_Proxy__args')
             object.__delattr__(self, '_Proxy__kwargs')
+
+
+def maybe_evaluate(obj):
+    try:
+        return obj.__maybe_evaluate__()
+    except AttributeError:
+        return obj
