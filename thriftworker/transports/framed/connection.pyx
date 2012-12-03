@@ -1,6 +1,7 @@
 from logging import getLogger
 from struct import Struct
 from io import BytesIO
+from sys import maxint
 
 cimport cython
 
@@ -28,11 +29,16 @@ cdef class Connection:
     def __init__(self, object producer, object loop, object client,
                  object sock, object on_close):
         # Default values.
+        self.left_buffer = None
         self.recv_bytes = self.message_length = 0
         self.status = WAIT_LEN
         self.struct = Struct(LENGTH_FORMAT)
         self.message_buffer = BytesIO()
         self.incoming_buffer = None
+
+        # Create request id generator.
+        self.request_id = 0
+        self.request_id_generator = iter(xrange(maxint // 2))
 
         # Given arguments.
         self.producer = producer
@@ -43,6 +49,16 @@ cdef class Connection:
 
         # Start watchers.
         self.client.start_read(self.cb_read_done)
+
+    @cython.profile(False)
+    cdef inline object next_request_id(self):
+        """Returns ``True`` if source is writable."""
+        try:
+            request_id = self.request_id = self.request_id_generator.next()
+        except StopIteration:
+            generator = self.request_id_generator = iter(xrange(maxint // 2))
+            request_id = self.request_id = generator.next()
+        return request_id
 
     @cython.profile(False)
     cdef inline bint is_writeable(self):
@@ -83,14 +99,14 @@ cdef class Connection:
             return
 
         if self.status == WAIT_LEN:
-            assert received > LENGTH_SIZE, "message length can't be read"
+            assert received >= LENGTH_SIZE, "message length can't be read"
 
             view = buffer(incoming_buffer)
             message_length = self.struct.unpack_from(view[0:LENGTH_SIZE])[0]
             assert message_length > 0, "negative or empty frame size, it seems" \
                                        " client doesn't use FramedTransport"
 
-            self.message_buffer.write(view[LENGTH_SIZE:])
+            self.message_buffer.write(view[LENGTH_SIZE:message_length + LENGTH_SIZE])
             self.message_length = message_length
             self.status = WAIT_MESSAGE
 
@@ -98,12 +114,21 @@ cdef class Connection:
 
         elif self.status == WAIT_MESSAGE:
             # Simply write data to buffer.
-            self.message_buffer.write(incoming_buffer)
+            left = self.message_length - self.recv_bytes
+            self.message_buffer.write(incoming_buffer[:left])
 
         self.recv_bytes += received
-        if self.recv_bytes >= self.message_length:
+        recv_bytes = self.recv_bytes
+
+        # We receive whole message.
+        if recv_bytes >= self.message_length:
             self.recv_bytes = 0
             self.status = WAIT_PROCESS
+
+        # Two requested come together.
+        if recv_bytes > self.message_length:
+            since = self.message_length - recv_bytes
+            self.left_buffer = incoming_buffer[since:]
 
     cpdef close(self):
         """Closes connection."""
@@ -121,7 +146,7 @@ cdef class Connection:
         self.on_close = self.client = self.message_buffer = \
             self.incoming_buffer = None
 
-    cpdef ready(self, object all_ok, object message):
+    cpdef ready(self, object all_ok, object message, object request_id):
         """The ready can switch Connection to three states:
 
             WAIT_LEN if request was oneway.
@@ -130,6 +155,9 @@ cdef class Connection:
 
         """
         assert self.is_waiting(), 'socket is not waiting for answer'
+
+        if self.request_id != request_id:
+            return
 
         if not all_ok:
             self.close()
@@ -168,15 +196,24 @@ cdef class Connection:
                 # We aren't ready to transfer message to sink.
                 return
             elif not self.is_waiting():
+                # Grow up request id.
+                request_id = self.next_request_id()
                 # Change state to needed.
-                self.status = WAIT_ANSWER
+                self.status = WAIT_ANSWER if not self.left_buffer else WAIT_LEN
                 # Send message to workers.
-                self.producer(self, self.message_buffer.getvalue())
+                self.producer(self, self.message_buffer.getvalue(), request_id)
                 # Reset message buffer.
                 self.message_buffer = BytesIO()
             else:
                 # Socket was closed while we wait for answer.
                 self.close()
+
+            if self.left_buffer:
+                # If something left in buffer that's because of one way
+                # request. We may to ignore answer to previous request.
+                left_buffer = self.left_buffer
+                self.left_buffer = None
+                self.cb_read_done(handle, left_buffer, error)
 
         except Exception as exc:
             logger.exception(exc)
