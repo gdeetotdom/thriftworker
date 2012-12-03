@@ -14,11 +14,12 @@ class BaseWorker(LoopMixin):
     __metaclass__ = ABCMeta
 
     #: Store request in this tuple.
-    Request = namedtuple('Request', 'connection data')
+    Request = namedtuple('Request', 'connection data request_id')
 
     def _create_callback(self, request):
         """Create callback that should be called after request was done."""
         connection = request.connection
+        request_id = request.request_id
 
         def inner_callback(result, exception=None):
             if exception is None:
@@ -27,7 +28,7 @@ class BaseWorker(LoopMixin):
                 logger.error(exception[1], exc_info=exception)
                 success, response = False, ''
             if connection.is_waiting():
-                connection.ready(success, response)
+                connection.ready(success, response, request_id)
 
         return inner_callback
 
@@ -41,9 +42,11 @@ class BaseWorker(LoopMixin):
         processor = self.app.services.create_processor(service)
         consume = self.create_consumer(processor)
 
-        def inner_producer(connection, data):
+        def inner_producer(connection, data, request_id):
             """Enqueue given request to thread pool."""
-            consume(Request(connection=connection, data=data))
+            consume(Request(connection=connection,
+                            data=data,
+                            request_id=request_id))
 
         return inner_producer
 
