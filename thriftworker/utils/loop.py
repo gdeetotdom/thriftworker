@@ -24,8 +24,8 @@ class in_loop(object):
     def __create(self, obj):
         method = self.__func.__get__(obj)
 
-        @wraps(self.__func)
-        def inner_decorator(*args, **kwargs):
+        def delayed_method(*args, **kwargs):
+            """Execute method in loop but wait for it."""
             event = current_app.env.RealEvent()
             d = {'result': None, 'exception': None}
 
@@ -57,16 +57,24 @@ class in_loop(object):
             else:
                 return d['result']
 
-        try:
-            ident = current_app.loop.ident
-        except AttributeError:
-            raise RuntimeError('Loop not started')
+        @wraps(self.__func)
+        def inner_decorator(*args, **kwargs):
+            """Detect current thread and use appropriate method to avoid
+            loop blocking.
 
-        if ident == current_app.env.get_real_ident():
-            # Don't block main loop.
-            return method
-        else:
-            return inner_decorator
+            """
+            try:
+                ident = current_app.loop.ident
+            except AttributeError:
+                raise RuntimeError('Loop not started')
+
+            if ident == current_app.env.get_real_ident():
+                # Don't block main loop.
+                return method(*args, **kwargs)
+            else:
+                return delayed_method(*args, **kwargs)
+
+        return inner_decorator
 
     def __get__(self, obj, type=None):
         if obj is None:

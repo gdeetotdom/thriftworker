@@ -1,11 +1,12 @@
 from __future__ import absolute_import
 
 import socket
+from contextlib import closing
 
-from thriftworker.tests.utils import TestCase
-from thriftworker.transports.base import BaseAcceptor
+from thriftworker.tests.utils import TestCase, start_stop_ctx
+from thriftworker.transports.base import BaseAcceptor, Acceptors
 
-from .utils import AcceptorMixin
+from .utils import AcceptorMixin, AcceptorsMixin
 
 
 class EchoConnection(object):
@@ -59,3 +60,23 @@ class TestBaseAcceptor(AcceptorMixin, TestCase):
             client.send(payload)
             self.assertEqual(payload, client.recv(4))
         self.assertEqual(0, acceptor.connections_number)
+
+
+class TestAcceptors(AcceptorsMixin, TestCase):
+
+    Acceptor = Acceptor
+    Acceptors = Acceptors
+
+    def test_register(self):
+        acceptors = self.Acceptors()
+        sock = socket.socket()
+        sock.bind(('localhost', 0))
+        sock.listen(0)
+        with closing(sock), start_stop_ctx(acceptors):
+            acceptors.register(sock.fileno(), self.service_name)
+            self.wakeup_loop()
+            registered_acceptors = list(acceptors)
+            self.assertEqual(1, len(registered_acceptors))
+            acceptor = registered_acceptors[0]
+            self.assertTrue(acceptor.active)
+        self.assertFalse(acceptor.active)
