@@ -120,7 +120,7 @@ class TestFramedAcceptor(AcceptorMixin, TestCase):
     def test_several_one_way(self):
         payload = b'xxxx'
         process = self.processor.process = Mock(return_value=None)
-        factor = 10
+        factor = 2
 
         source = socket.socket()
         acceptor = self.Acceptor(name=self.service_name,
@@ -131,3 +131,17 @@ class TestFramedAcceptor(AcceptorMixin, TestCase):
             self.wait_for_predicate(lambda: process.call_count != factor)
 
         self.assertEqual(factor, process.call_count)
+
+    def test_exception(self):
+        payload = b'xxxx'
+
+        def process(in_prot, out_prot):
+            raise Exception()
+
+        self.processor.process = process
+        source = socket.socket()
+        acceptor = self.Acceptor(name=self.service_name,
+                                 descriptor=source.fileno())
+        with self.maybe_connect(source, acceptor) as client:
+            client.send(self.encode_length(self.create_message(payload)))
+            self.assertEqual('', client.recv(4))
