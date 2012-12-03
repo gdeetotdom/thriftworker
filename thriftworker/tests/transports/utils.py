@@ -14,7 +14,8 @@ class AcceptorMixin(StartStopLoopMixin):
 
     def setUp(self):
         super(AcceptorMixin, self).setUp()
-        self.Acceptor = self.app.subclass_with_self(type(self).Acceptor)
+        Acceptor = self.app.subclass_with_self(type(self).Acceptor)
+        self.Acceptor = self.app.Acceptor = Acceptor
         service_name = self.service_name = 'SomeService'
         processor = self.processor = Mock()
         self.app.services.register(service_name, processor)
@@ -35,3 +36,13 @@ class AcceptorMixin(StartStopLoopMixin):
             client.connect(source.getsockname())
             self.wakeup_loop()
             yield client
+
+
+class AcceptorsMixin(AcceptorMixin):
+
+    Acceptors = None
+
+    def setUp(self):
+        super(AcceptorsMixin, self).setUp()
+        Acceptors = self.app.subclass_with_self(type(self).Acceptors)
+        self.Acceptors = self.app.Acceptors = Acceptors

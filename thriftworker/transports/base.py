@@ -93,6 +93,11 @@ class BaseAcceptor(LoopMixin):
         """Return number of active connections."""
         return len(self._connections)
 
+    @property
+    def active(self):
+        """Is current accepter active."""
+        return self._poller.active
+
     def create_acceptor(self):
         """Return function that should accept new connections."""
         loop = self.loop
@@ -108,7 +113,7 @@ class BaseAcceptor(LoopMixin):
 
         def accept_connection(handle, events, error):
             """Function that try to accept new connection."""
-            if error:
+            if error:  # pragma: no cover
                 logger.error('Error handling new connection for'
                              ' service %r: %s', service, strerror(error))
                 return
@@ -142,6 +147,10 @@ class Acceptors(LoopMixin):
         self._outgoing = deque()
         self._acceptors = set()
         super(Acceptors, self).__init__()
+
+    def __iter__(self):
+        """Iterate over registered acceptors."""
+        return iter(self._acceptors)
 
     @cached_property
     def Acceptor(self):
