@@ -12,6 +12,7 @@ var
 sdist
 develop-eggs
 .installed.cfg
+*.c
 *.so
 MANIFEST
 docs/html/

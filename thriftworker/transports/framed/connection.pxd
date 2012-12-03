@@ -18,6 +18,9 @@ cdef class Connection:
     cdef object struct
     cdef object message_buffer
     cdef object incoming_buffer
+    cdef object left_buffer
+    cdef object request_id_generator
+    cdef object request_id
 
     # Given arguments.
     cdef object producer
@@ -26,6 +29,8 @@ cdef class Connection:
     cdef object sock
     cdef object on_close
 
+    cdef inline object next_request_id(self)
+
     cdef inline bint is_writeable(self)
     cdef inline bint is_readable(self)
     cdef inline bint is_ready(self)
@@ -33,7 +38,7 @@ cdef class Connection:
     cpdef is_closed(self)
 
     cdef inline read(self)
-    cpdef ready(self, object all_ok, object message)
+    cpdef ready(self, object all_ok, object message, object request_id)
     cpdef close(self)
 
     cdef inline void handle_error(self, object error)
