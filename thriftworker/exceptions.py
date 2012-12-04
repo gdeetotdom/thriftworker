@@ -8,7 +8,3 @@ class AllocationError(Exception):
 
 class BindError(Exception):
     """Error on socket binding."""
-
-
-class ServiceAlreadyRegistered(Exception):
-    """Given service already registered in storage."""
