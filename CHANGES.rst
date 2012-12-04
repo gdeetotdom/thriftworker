@@ -1,8 +1,8 @@
 Changelog
 =========
 
-0.1.7 (unreleased)
-------------------
+0.1.7 - 0.1.10 (unreleased)
+---------------------------
 
 - Add support for prefork model;
 
