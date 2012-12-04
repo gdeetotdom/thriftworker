@@ -1,6 +1,15 @@
 language: python
 python:
     - 2.7
+matrix:
+    exclude:
+        - python: "2.7"
+    include:
+        - python: "2.7"
+          env: TOXENV=py$(echo $TRAVIS_PYTHON_VERSION | tr -d .)
+        - python: "2.7"
+          env: TOXENV=py$(echo $TRAVIS_PYTHON_VERSION | tr -d .)_gevent
 install:
     - pip install --use-mirrors cython tox
-script: TOXENV=py$(echo $TRAVIS_PYTHON_VERSION | tr -d .) tox
+script:
+    - tox
