@@ -10,6 +10,6 @@ matrix:
         - python: "2.7"
           env: TOXENV=py27_gevent
 install:
-    - pip install --use-mirrors tox
+    - pip install --use-mirrors cython tox
 script:
     - tox
