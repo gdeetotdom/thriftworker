@@ -1,10 +1,9 @@
 from logging import getLogger
 from struct import Struct
-from io import BytesIO
 from sys import maxint
 
 cimport cython
-
+from six import next, BytesIO
 from pyuv.errno import strerror, UV_EOF
 
 from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
@@ -54,10 +53,10 @@ cdef class Connection:
     cdef inline object next_request_id(self):
         """Returns ``True`` if source is writable."""
         try:
-            request_id = self.request_id = self.request_id_generator.next()
+            request_id = self.request_id = next(self.request_id_generator)
         except StopIteration:
             generator = self.request_id_generator = iter(xrange(maxint // 2))
-            request_id = self.request_id = generator.next()
+            request_id = self.request_id = next(generator)
         return request_id
 
     @cython.profile(False)

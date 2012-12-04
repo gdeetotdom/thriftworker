@@ -7,8 +7,19 @@ from mock import Mock
 
 from thriftworker.tests.utils import StartStopLoopMixin, start_stop_ctx
 
+TIMEOUT = 5.0
 
-class AcceptorMixin(StartStopLoopMixin):
+
+class WorkerMixin(StartStopLoopMixin):
+
+    def setUp(self):
+        super(WorkerMixin, self).setUp()
+        worker = self.app.worker
+        worker.start()
+        self.addCleanup(worker.stop)
+
+
+class AcceptorMixin(WorkerMixin):
 
     Acceptor = None
 
@@ -20,7 +31,7 @@ class AcceptorMixin(StartStopLoopMixin):
         processor = self.processor = Mock()
         self.app.services.register(service_name, processor)
 
-    def wait_for_predicate(self, func, timeout=5):
+    def wait_for_predicate(self, func, timeout=TIMEOUT):
         tic = time()
         while func() and tic + timeout > time():
             sleep(0.1)
@@ -32,7 +43,7 @@ class AcceptorMixin(StartStopLoopMixin):
         source.bind(('localhost', 0))
         source.listen(0)
         with closing(source), closing(client), start_stop_ctx(acceptor):
-            client.settimeout(5.0)
+            client.settimeout(TIMEOUT)
             client.connect(source.getsockname())
             self.wakeup_loop()
             yield client

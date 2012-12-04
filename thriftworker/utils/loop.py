@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import sys
 from functools import wraps
 
+import six
 from pyuv import Async
 
 from thriftworker.state import current_app
@@ -30,6 +31,7 @@ class in_loop(object):
             d = {'result': None, 'exception': None}
 
             def inner_callback(handle):
+                print handle
                 handle.close()
                 try:
                     d['result'] = method(*args, **kwargs)
@@ -53,7 +55,7 @@ class in_loop(object):
 
             if d['exception'] is not None:
                 exc_type, exc, tb = d['exception']
-                raise exc_type, exc, tb
+                six.reraise(exc_type, exc, tb)
             else:
                 return d['result']
 

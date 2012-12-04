@@ -6,6 +6,8 @@ import imp
 import importlib
 from contextlib import contextmanager
 
+import six
+
 
 def symbol_by_name(name, aliases={}, imp=None, package=None,
                    sep='.', default=None, **kwargs):
@@ -58,7 +60,7 @@ def symbol_by_name(name, aliases={}, imp=None, package=None,
             module = imp(module_name, package=package, **kwargs)
         except ValueError, exc:
             exc = ValueError("Couldn't import %r: %s" % (name, exc))
-            raise ValueError, exc, sys.exc_info()[2]
+            six.reraise(ValueError, exc, sys.exc_info()[2])
         return getattr(module, cls_name) if cls_name else module
     except (ImportError, AttributeError):
         if default is None:
@@ -86,11 +88,13 @@ def qualname(obj):
 def get_real_module(name):
     """Get the real Python module, regardless of any monkeypatching"""
     fp, pathname, description = imp.find_module(name)
+    imp.acquire_lock()
     try:
         _realmodule = imp.load_module('_real_{0}'.format(name), fp, pathname,
                                       description)
         return _realmodule
     finally:
+        imp.release_lock()
         if fp:
             fp.close()
 
