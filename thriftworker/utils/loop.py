@@ -31,7 +31,6 @@ class in_loop(object):
             d = {'result': None, 'exception': None}
 
             def inner_callback(handle):
-                print handle
                 handle.close()
                 try:
                     d['result'] = method(*args, **kwargs)
