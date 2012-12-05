@@ -1,3 +1,4 @@
 nose
-coverage
+nose-cover3
+coverage>=3.0
 mock
