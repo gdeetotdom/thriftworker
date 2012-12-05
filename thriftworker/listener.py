@@ -96,6 +96,12 @@ class Listeners(LoopMixin):
     def __iter__(self):
         return iter(self._listeners)
 
+    def __contains__(self, listener):
+        return listener in self._listeners
+
+    def __getitem__(self, key):
+        return self._listeners[key]
+
     @cached_property
     def Listener(self):
         """Shortcut to :class:`thriftworker.listener.Listener` class."""
@@ -117,5 +123,6 @@ class Listeners(LoopMixin):
     def register(self, name, host, port, backlog=None):
         """Register new listener with given parameters."""
         listener = self.Listener(name, (host, port), backlog=backlog)
+        # We should preserve order in which listeners added.
         self._listeners.append(listener)
         del self.channels, self.enumerated

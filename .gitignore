@@ -12,11 +12,9 @@ var
 sdist
 develop-eggs
 .installed.cfg
-*.c
 *.so
 MANIFEST
 docs/html/
-thriftworker/*.c
 
 # Installer logs
 pip-log.txt

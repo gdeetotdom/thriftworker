@@ -1,13 +1,16 @@
 from __future__ import absolute_import
 
-from threading import Event
-from pyuv import Loop, Async, Idle
-
+import types
+from functools import wraps
 from contextlib import contextmanager
 from unittest import TestCase as BaseTestCase
+from unittest.case import SkipTest
+
+from pyuv import Loop, Async, Idle
 
 from thriftworker import state
 from thriftworker.app import ThriftWorker
+from thriftworker.utils.env import detect_environment
 
 
 @contextmanager
@@ -44,7 +47,7 @@ class StartStopLoopMixin(CustomAppMixin):
         self.addCleanup(container.stop)
 
     def wakeup_loop(self):
-        event = Event()
+        event = self.app.env.RealEvent()
         handles = []
 
         def idle_cb(handle):
@@ -60,3 +63,24 @@ class StartStopLoopMixin(CustomAppMixin):
         async = Async(self.loop, async_cb)
         async.send()
         event.wait()
+
+
+def custom_env_needed(env):
+    """Skip test if current environment differ from needed."""
+
+    def inner_decorator(test_item):
+        reason = 'Current environment differ from needed!'
+
+        if env != detect_environment():
+            if not isinstance(test_item, (type, types.ClassType)):
+                @wraps(test_item)
+                def skip_wrapper(*args, **kwargs):
+                    raise SkipTest(reason)
+                test_item = skip_wrapper
+
+            test_item.__unittest_skip__ = True
+            test_item.__unittest_skip_why__ = reason
+
+        return test_item
+
+    return inner_decorator

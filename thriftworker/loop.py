@@ -38,10 +38,17 @@ class LoopContainer(LoopMixin):
         except HandleError:
             pass  # pragma: no cover
 
+    def _error_handle(self, exc_type, value, traceback):
+        logger.exception(value, exc_info=(exc_type, value, traceback))
+
+    def _configure_loop(self, loop):
+        setattr(loop, 'ident', self.app.env.get_real_ident())
+        loop.excepthook = self._error_handle
+
     def _run(self):
         """Run event loop."""
         loop = self.loop
-        setattr(loop, 'ident', self.app.env.get_real_ident())
+        self._configure_loop(loop)
         logger.debug('Loop #%r started...', id(loop))
         self._started.set()
         try:

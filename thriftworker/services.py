@@ -5,8 +5,6 @@ from collections import namedtuple
 
 from thrift.transport.TTransport import TMemoryBuffer
 
-from .exceptions import ServiceAlreadyRegistered
-
 
 class Services(object):
     """Process new requests and return response. Store processor
@@ -23,6 +21,18 @@ class Services(object):
         self.services = {}
         self.proto_factory = self.app.protocol_factory
         super(Services, self).__init__()
+
+    def __iter__(self):
+        """Get names of all registered services."""
+        return iter(self.services)
+
+    def __getitem__(self, key):
+        """Get service by name."""
+        return self.services[key]
+
+    def __contains__(self, key):
+        """Is service with given name registered?"""
+        return key in self.services
 
     def register(self, service_name, processor, proto_factory=None):
         """Register new processor for given service."""

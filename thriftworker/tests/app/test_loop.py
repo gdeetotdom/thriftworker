@@ -14,15 +14,12 @@ class TestLoopContainer(CustomAppMixin, TestCase):
         return start_stop_ctx(container)
 
     def test_start_stop(self):
-        loop = self.loop
         container = self.container
         with self.context():
             self.assertIsNotNone(container._guard)
             self.assertTrue(container._guard.active)
-            self.assertEqual(1, loop.active_handles)
         self.assertTrue(container._started.is_set())
         self.assertTrue(container._stopped.is_set())
-        self.assertEqual(0, loop.active_handles)
 
     def test_wakeup(self):
         container = self.container
