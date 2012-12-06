@@ -11,6 +11,7 @@ from gevent.pool import Pool
 
 from thriftworker.workers.base import BaseWorker
 from thriftworker.utils.decorators import cached_property
+from thriftworker.utils.loop import in_loop
 
 logger = logging.getLogger(__name__)
 
@@ -84,14 +85,26 @@ class GeventWorker(BaseWorker):
             else:
                 callback()
 
-    def start(self):
+    @in_loop
+    def _acceptor_start(self):
+        """Start pyuv handles."""
         self._acceptor_prepare_handle.start(self._before_acceptor_iteration)
+
+    def start(self):
+        """Start worker and all gevent handles."""
+        self._acceptor_start()
         self._worker_prepare_handle.start(self._before_worker_iteration)
         self._worker_async_handle.start(lambda: None)
 
+    @in_loop
+    def _acceptor_stop():
+        """Stop pyuv handles."""
+        self._acceptor_async_handle.close()
+        self._acceptor_prepare_handle.close()
+
     def stop(self):
+        """Stop pool and all started handles."""
         self._pool.join()
         self._worker_async_handle.stop()
         self._worker_prepare_handle.stop()
-        self._acceptor_async_handle.close()
-        self._acceptor_prepare_handle.close()
+        self._acceptor_stop()
