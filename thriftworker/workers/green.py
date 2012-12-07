@@ -86,18 +86,18 @@ class GeventWorker(BaseWorker):
                 callback()
 
     @in_loop
-    def _acceptor_start(self):
+    def _loop_setup(self):
         """Start pyuv handles."""
         self._acceptor_prepare_handle.start(self._before_acceptor_iteration)
 
     def start(self):
         """Start worker and all gevent handles."""
-        self._acceptor_start()
+        self._loop_setup()
         self._worker_prepare_handle.start(self._before_worker_iteration)
         self._worker_async_handle.start(lambda: None)
 
     @in_loop
-    def _acceptor_stop():
+    def _loop_teardown(self):
         """Stop pyuv handles."""
         self._acceptor_async_handle.close()
         self._acceptor_prepare_handle.close()
@@ -107,4 +107,4 @@ class GeventWorker(BaseWorker):
         self._pool.join()
         self._worker_async_handle.stop()
         self._worker_prepare_handle.stop()
-        self._acceptor_stop()
+        self._loop_teardown()
