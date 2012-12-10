@@ -46,7 +46,7 @@ class GeventWorker(BaseWorker):
     def create_consumer(self, processor):
         incoming = self._incoming
         async = self._worker_async_handle
-        create_callback = self._create_callback
+        create_callback = self.create_callback
 
         def inner_consumer(request):
             incoming.append((processor, request, create_callback(request)))

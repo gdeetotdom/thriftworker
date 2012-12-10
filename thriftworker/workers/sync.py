@@ -18,7 +18,7 @@ class SyncWorker(BaseWorker):
         return ThreadPool(self.loop)
 
     def create_consumer(self, processor):
-        create_callback = self._create_callback
+        create_callback = self.create_callback
         pool = self.pool
 
         def inner_consumer(request):

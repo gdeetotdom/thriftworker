@@ -17,7 +17,7 @@ class BaseWorker(LoopMixin):
     #: Store request in this tuple.
     Request = namedtuple('Request', 'connection data request_id')
 
-    def _create_callback(self, request):
+    def create_callback(self, request):
         """Create callback that should be called after request was done."""
         connection = request.connection
         request_id = request.request_id
