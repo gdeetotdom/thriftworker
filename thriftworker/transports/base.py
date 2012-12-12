@@ -8,6 +8,7 @@ from abc import ABCMeta, abstractproperty
 
 from pyuv import Async, Pipe, Poll, UV_READABLE
 from pyuv.errno import strerror
+from six import with_metaclass
 
 from thriftworker.constants import BACKLOG_SIZE
 from thriftworker.utils.mixin import LoopMixin
@@ -55,9 +56,7 @@ class Connections(object):
                 connection.close()
 
 
-class BaseAcceptor(LoopMixin):
-
-    __metaclass__ = ABCMeta
+class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
 
     Connections = Connections
 
