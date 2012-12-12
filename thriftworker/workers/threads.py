@@ -11,6 +11,7 @@ from pyuv import Prepare, Async
 
 from thriftworker.utils.decorators import cached_property
 from thriftworker.workers.base import BaseWorker
+from thriftworker.utils.loop import in_loop
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,7 @@ class ThreadsWorker(BaseWorker):
     """Process all request in threadpool."""
 
     def __init__(self):
+        # Store worker's replies here.
         self._outgoing = deque()
         super(ThreadsWorker, self).__init__()
 
@@ -101,14 +103,13 @@ class ThreadsWorker(BaseWorker):
 
     @cached_property
     def _pool(self):
-        async = self._async_handle
-        outgoing = self._outgoing
-        wakeup = lambda: async.send()
-        callback = lambda fn: outgoing.append(fn)
-        return Pool(wakeup=wakeup, callback=callback,
+        return Pool(wakeup=self._async_handle.send,
+                    callback=self._outgoing.append,
                     size=self.app.pool_size)
 
     def _before_iteration(self, handle):
+        """Should be used to run callbacks in loop's thread. callbacks
+        provided by worker threads."""
         outgoing = self._outgoing
         while True:
             try:
@@ -119,7 +120,7 @@ class ThreadsWorker(BaseWorker):
                 callback()
 
     def create_consumer(self, processor):
-        create_callback = self._create_callback
+        create_callback = self.create_callback
         pool = self._pool
 
         def inner_consumer(request):
@@ -127,11 +128,21 @@ class ThreadsWorker(BaseWorker):
 
         return inner_consumer
 
-    def start(self):
+    @in_loop
+    def _loop_setup(self):
+        """Start pyuv handles."""
         self._prepare_handle.start(self._before_iteration)
+
+    def start(self):
+        self._loop_setup()
         self._pool.start()
+
+    @in_loop
+    def _loop_teardown(self):
+        """Stop pyuv handles."""
+        self._async_handle.close()
+        self._prepare_handle.close()
 
     def stop(self):
         self._pool.stop()
-        self._async_handle.close()
-        self._prepare_handle.close()
+        self._loop_teardown()

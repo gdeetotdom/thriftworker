@@ -5,6 +5,7 @@ from collections import namedtuple
 from abc import ABCMeta, abstractmethod
 
 from thriftworker.utils.mixin import LoopMixin
+from thriftworker.utils.loop import in_loop
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class BaseWorker(LoopMixin):
     #: Store request in this tuple.
     Request = namedtuple('Request', 'connection data request_id')
 
-    def _create_callback(self, request):
+    def create_callback(self, request):
         """Create callback that should be called after request was done."""
         connection = request.connection
         request_id = request.request_id
@@ -50,8 +51,10 @@ class BaseWorker(LoopMixin):
 
         return inner_producer
 
+    @in_loop
     def start(self):
-        pass
+        """Start worker. By default do nothing."""
 
+    @in_loop
     def stop(self):
-        pass
+        """Stop worker. By default do nothing."""
