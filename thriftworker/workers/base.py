@@ -4,15 +4,15 @@ import logging
 from collections import namedtuple
 from abc import ABCMeta, abstractmethod
 
+from six import with_metaclass
+
 from thriftworker.utils.mixin import LoopMixin
 from thriftworker.utils.loop import in_loop
 
 logger = logging.getLogger(__name__)
 
 
-class BaseWorker(LoopMixin):
-
-    __metaclass__ = ABCMeta
+class BaseWorker(with_metaclass(ABCMeta, LoopMixin)):
 
     #: Store request in this tuple.
     Request = namedtuple('Request', 'connection data request_id')
