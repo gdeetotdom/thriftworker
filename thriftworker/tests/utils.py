@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import types
+from time import time, sleep
 from functools import wraps
 from contextlib import contextmanager
 from unittest import TestCase as BaseTestCase
@@ -11,6 +12,8 @@ from pyuv import Loop, Async, Idle
 from thriftworker import state
 from thriftworker.app import ThriftWorker
 from thriftworker.utils.env import detect_environment
+
+TIMEOUT = 5.0
 
 
 @contextmanager
@@ -36,6 +39,11 @@ class CustomAppMixin(object):
         super(CustomAppMixin, self).setUp()
         loop = self.loop = Loop()
         self.app = ThriftWorker(loop=loop)
+
+    def wait_for_predicate(self, func, timeout=TIMEOUT):
+        tic = time()
+        while func() and tic + timeout > time():
+            sleep(0.1)
 
 
 class StartStopLoopMixin(CustomAppMixin):

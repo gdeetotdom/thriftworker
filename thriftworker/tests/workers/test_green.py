@@ -5,8 +5,7 @@ try:
 except ImportError:
     GeventWorker = None
 from thriftworker.constants import GEVENT_ENV
-from thriftworker.tests.utils import TestCase, custom_env_needed, \
-    start_stop_ctx
+from thriftworker.tests.utils import TestCase, custom_env_needed
 
 from .utils import WorkerMixin
 
@@ -16,6 +15,5 @@ class TestGreenWorker(WorkerMixin, TestCase):
 
     Worker = GeventWorker
 
-    def test_start_stop(self):
-        with start_stop_ctx(self.Worker()) as worker:
-            pass
+    def test_request(self):
+        self.check_request(self.Worker())
