@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 import socket
-from time import time, sleep
 from contextlib import closing, contextmanager
 from mock import Mock
 
@@ -30,11 +29,6 @@ class AcceptorMixin(WorkerMixin):
         service_name = self.service_name = 'SomeService'
         processor = self.processor = Mock()
         self.app.services.register(service_name, processor)
-
-    def wait_for_predicate(self, func, timeout=TIMEOUT):
-        tic = time()
-        while func() and tic + timeout > time():
-            sleep(0.1)
 
     @contextmanager
     def maybe_connect(self, source, acceptor):

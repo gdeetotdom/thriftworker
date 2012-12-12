@@ -2,14 +2,14 @@ from __future__ import absolute_import
 
 from abc import ABCMeta, abstractproperty, abstractmethod
 
+from six import with_metaclass
 
-class BaseEnv(object):
+
+class BaseEnv(with_metaclass(ABCMeta)):
     """Provided methods and property that should be used to work properly with
     current environment, for example, monkey patched Python stdlib by gevent.
 
     """
-
-    __metaclass__ = ABCMeta
 
     @abstractmethod
     def start_real_thread(self, func, args=None, kwargs=None):

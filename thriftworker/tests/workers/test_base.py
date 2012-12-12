@@ -22,14 +22,14 @@ class TestBaseWorker(WorkerMixin, TestCase):
 
     Worker = Worker
 
-    def start_worker(self):
+    def create_worker(self):
         consumer = Mock()
         worker = self.Worker(consumer)
-        return start_stop_ctx(worker)
+        return worker
 
     def test_producer(self):
         connection, data, request_id = object(), object(), object()
-        with self.start_worker() as worker:
+        with start_stop_ctx(self.create_worker()) as worker:
             producer = worker.create_producer(self.service_name)
             producer(connection, data, request_id)
             consumer = worker.consumer
@@ -45,7 +45,7 @@ class TestBaseWorker(WorkerMixin, TestCase):
         connection, data, request_id, result = \
             Mock(), object(), object(), object()
         connection.is_waiting.return_value = True
-        with self.start_worker() as worker:
+        with start_stop_ctx(self.create_worker()) as worker:
             request = self.Worker.Request(connection, data, request_id)
             callback = worker.create_callback(request)
             callback(result)
