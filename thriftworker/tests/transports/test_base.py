@@ -78,5 +78,9 @@ class TestAcceptors(AcceptorsMixin, TestCase):
             registered_acceptors = list(acceptors)
             self.assertEqual(1, len(registered_acceptors))
             acceptor = registered_acceptors[0]
+            self.assertFalse(acceptor.active)
+            acceptors.start_by_name(self.service_name)
+            self.wakeup_loop()
+            self.wait_for_predicate(lambda: not acceptor.active)
             self.assertTrue(acceptor.active)
         self.assertFalse(acceptor.active)

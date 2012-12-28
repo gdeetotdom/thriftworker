@@ -156,7 +156,7 @@ class Acceptors(LoopMixin):
 
     def __iter__(self):
         """Iterate over registered acceptors."""
-        return iter(self._acceptors)
+        return iter(self._acceptors.values())
 
     @cached_property
     def Acceptor(self):
