@@ -24,7 +24,7 @@ def ignore_eagain(socket):
     try:
         yield
     except socket.error as exc:
-        if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+        if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK, errno.EINVAL):
             raise
 
 
@@ -94,7 +94,7 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
 
     @property
     def active(self):
-        """Is current accepter active."""
+        """Is current acceptor active."""
         return self._poller.active
 
     def create_acceptor(self):
@@ -130,10 +130,17 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
 
     @in_loop
     def start(self):
-        self._poller.start(UV_READABLE, self.create_acceptor())
+        if not self.active:
+            self._poller.start(UV_READABLE, self.create_acceptor())
 
     @in_loop
     def stop(self):
+        if self.active:
+            self._poller.stop()
+
+    @in_loop
+    def close(self):
+        """Close all resources."""
         self._poller.close()
         self._connections.close()
         self._socket.close()
@@ -144,7 +151,7 @@ class Acceptors(LoopMixin):
 
     def __init__(self):
         self._outgoing = deque()
-        self._acceptors = set()
+        self._acceptors = {}
         super(Acceptors, self).__init__()
 
     def __iter__(self):
@@ -174,9 +181,16 @@ class Acceptors(LoopMixin):
 
     def register(self, fd, name, backlog=None):
         """Register new acceptor in pool."""
-        acceptor = self.Acceptor(name, fd, backlog=backlog)
-        self._acceptors.add(acceptor)
+        self._acceptors[name] = self.Acceptor(name, fd, backlog=backlog)
+
+    def start_by_name(self, name):
+        acceptor = self._acceptors[name]
         self._outgoing.append(acceptor.start)
+        self._handle.send()
+
+    def stop_by_name(self, name):
+        acceptor = self._acceptors[name]
+        self._outgoing.append(acceptor.stop)
         self._handle.send()
 
     @in_loop
@@ -186,5 +200,5 @@ class Acceptors(LoopMixin):
     @in_loop
     def stop(self):
         self._handle.close()
-        for acceptor in self._acceptors:
-            acceptor.stop()
+        for acceptor in self._acceptors.values():
+            acceptor.close()
