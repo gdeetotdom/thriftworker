@@ -3,10 +3,9 @@ from __future__ import absolute_import
 import errno
 import logging
 from contextlib import contextmanager
-from collections import deque
 from abc import ABCMeta, abstractproperty
 
-from pyuv import Async, Pipe, Poll, UV_READABLE
+from pyuv import Pipe, Poll, UV_READABLE
 from pyuv.errno import strerror
 from six import with_metaclass
 
@@ -150,7 +149,6 @@ class Acceptors(LoopMixin):
     """Maintain pool of acceptors. Start them when needed."""
 
     def __init__(self):
-        self._outgoing = deque()
         self._acceptors = {}
         super(Acceptors, self).__init__()
 
@@ -163,42 +161,23 @@ class Acceptors(LoopMixin):
         """Shortcut to :class:`thriftworker.acceptor.Acceptor` class."""
         return self.app.Acceptor
 
-    @cached_property
-    def _handle(self):
-        """Handle that should start acceptors in loop thread."""
-        outgoing = self._outgoing
-
-        def cb(handle):
-            while True:
-                try:
-                    callback = outgoing.popleft()
-                except IndexError:
-                    break
-                else:
-                    callback()
-
-        return Async(self.loop, cb)
-
     def register(self, fd, name, backlog=None):
         """Register new acceptor in pool."""
         self._acceptors[name] = self.Acceptor(name, fd, backlog=backlog)
 
     def start_by_name(self, name):
         acceptor = self._acceptors[name]
-        self._outgoing.append(acceptor.start)
-        self._handle.send()
+        self.app.loop_container.callback(acceptor.start)
 
     def stop_by_name(self, name):
         acceptor = self._acceptors[name]
-        self._outgoing.append(acceptor.stop)
-        self._handle.send()
+        self.app.loop_container.callback(acceptor.stop)
 
     @in_loop
     def start(self):
-        self._handle.send()
+        pass
 
     @in_loop
     def stop(self):
-        self._handle.close()
         for acceptor in self._acceptors.values():
             acceptor.close()
