@@ -28,6 +28,10 @@ except ImportError:
     cython_installed = False
 
 
+# current location
+here = os.path.abspath(os.path.dirname(__file__))
+
+
 #-----------------------------------------------------------------------------
 # Commands
 #-----------------------------------------------------------------------------
@@ -112,15 +116,32 @@ def source_extension(name):
     return os.path.join('thriftworker', *parts)
 
 
+modules = {
+    'transports.framed.connection': dict(),
+    'utils.stats.counter': dict(
+        include_dirs=[os.path.join(here, 'src')],
+        sources=[source_extension('utils.stats.counter'),
+                 os.path.join(here, 'src', 'cm_counter.c')],
+        extra_compile_args=['-std=c99'],
+    ),
+    'utils.stats.timer': dict(
+        include_dirs=[os.path.join(here, 'src')],
+        sources=[source_extension('utils.stats.timer'),
+                 os.path.join(here, 'src', 'cm_timer.c'),
+                 os.path.join(here, 'src', 'cm_quantile.c'),
+                 os.path.join(here, 'src', 'cm_heap.c')],
+        extra_compile_args=['-std=c99'],
+    ),
+}
+
 # collect extensions
-for module in ['transports.framed.connection']:
-    sources = [source_extension(module)]
-    ext = Extension('thriftworker.{0}'.format(module),
-                    sources=sources,
-                    **extension_kwargs)
+for module, kwargs in modules.items():
+    kwargs = dict(extension_kwargs, **kwargs)
+    kwargs.setdefault('sources', [source_extension(module)])
+    ext = Extension('thriftworker.{0}'.format(module), **kwargs)
     if suffix == '.pyx' and ext.sources[0].endswith('.c'):
         # undo setuptools stupidly clobbering cython sources:
-        ext.sources = sources
+        ext.sources = kwargs['sources']
     extensions.append(ext)
 
 
@@ -150,7 +171,6 @@ def add_doc(m):
 pats = {re_meta: add_default,
         re_vers: add_version,
         re_doc: add_doc}
-here = os.path.abspath(os.path.dirname(__file__))
 meta_fh = open(os.path.join(here, 'thriftworker/__init__.py'))
 try:
     meta = {}
