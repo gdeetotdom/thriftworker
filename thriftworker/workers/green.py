@@ -2,16 +2,13 @@ from __future__ import absolute_import
 
 import sys
 import logging
-from functools import partial
 from collections import deque
 
-from pyuv import Prepare, Async
 from gevent.hub import get_hub
 from gevent.pool import Pool
 
 from thriftworker.workers.base import BaseWorker
 from thriftworker.utils.decorators import cached_property
-from thriftworker.utils.loop import in_loop
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +25,6 @@ class GeventWorker(BaseWorker):
         return Pool(size=self.app.pool_size)
 
     @cached_property
-    def _acceptor_prepare_handle(self):
-        return Prepare(self.loop)
-
-    @cached_property
-    def _acceptor_async_handle(self):
-        return Async(self.loop, lambda handle: None)
-
-    @cached_property
     def _worker_prepare_handle(self):
         return get_hub().loop.prepare()
 
@@ -43,25 +32,24 @@ class GeventWorker(BaseWorker):
     def _worker_async_handle(self):
         return get_hub().loop.async()
 
-    def create_consumer(self, processor):
+    def create_consumer(self):
+        execute = self.app.loop_container.callback
         incoming = self._incoming
         async = self._worker_async_handle
-        create_callback = self.create_callback
 
-        def inner_consumer(request):
-            incoming.append((processor, request, create_callback(request)))
+        def inner_consumer(task, callback):
+            incoming.append((task, lambda *args: execute(callback, *args)))
             async.send()
 
         return inner_consumer
 
-    def _process_request(self, processor, request, callback):
+    def _process_request(self, task, callback):
         result, exception = None, None
         try:
-            result = processor(request.data)
+            result = task()
         except:
             exception = sys.exc_info()
-        self._outgoing.append(partial(callback, result, exception))
-        self._acceptor_async_handle.send()
+        callback(result, exception)
 
     def _before_worker_iteration(self):
         pool = self._pool
@@ -75,36 +63,13 @@ class GeventWorker(BaseWorker):
             else:
                 pool.apply_async(process_request, args)
 
-    def _before_acceptor_iteration(self, handle):
-        outgoing = self._outgoing
-        while True:
-            try:
-                callback = outgoing.popleft()
-            except IndexError:
-                break
-            else:
-                callback()
-
-    @in_loop
-    def _loop_setup(self):
-        """Start pyuv handles."""
-        self._acceptor_prepare_handle.start(self._before_acceptor_iteration)
-
     def start(self):
         """Start worker and all gevent handles."""
-        self._loop_setup()
         self._worker_prepare_handle.start(self._before_worker_iteration)
         self._worker_async_handle.start(lambda: None)
-
-    @in_loop
-    def _loop_teardown(self):
-        """Stop pyuv handles."""
-        self._acceptor_async_handle.close()
-        self._acceptor_prepare_handle.close()
 
     def stop(self):
         """Stop pool and all started handles."""
         self._pool.join()
         self._worker_async_handle.stop()
         self._worker_prepare_handle.stop()
-        self._loop_teardown()

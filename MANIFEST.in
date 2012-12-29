@@ -8,6 +8,7 @@ graft docs
 prune docs/build
 prune docs/html
 
+graft src
 graft thriftworker
 
 global-exclude *.so

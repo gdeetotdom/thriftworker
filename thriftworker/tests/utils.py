@@ -24,6 +24,8 @@ def start_stop_ctx(container):
         yield container
     finally:
         container.stop()
+        if hasattr(container, 'close'):
+            container.close()
 
 
 class TestCase(BaseTestCase):

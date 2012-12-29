@@ -3,51 +3,46 @@ from __future__ import absolute_import
 import sys
 import logging
 from threading import Thread, Event
-from collections import deque
 from Queue import Queue, Empty
-from functools import partial
-
-from pyuv import Prepare, Async
 
 from thriftworker.utils.decorators import cached_property
 from thriftworker.workers.base import BaseWorker
-from thriftworker.utils.loop import in_loop
 
 logger = logging.getLogger(__name__)
 
 
 class Worker(Thread):
+    """Simple threaded worker."""
 
-    def __init__(self, tasks, callback, wakeup):
+    def __init__(self, tasks):
         super(Worker, self).__init__()
         self.daemon = True
         self.tasks = tasks
-        self.callback = callback
-        self.wakeup = wakeup
         self._is_shutdown = Event()
         self._is_stopped = Event()
 
     def body(self):
-        cb = self.callback
+        """Consume messages from queue and execute them until empty message
+        sent.
+
+        """
         tasks = self.tasks
-        wakeup = self.wakeup
         shutdown = self._is_shutdown.set
         while True:
             try:
-                task = tasks.get()
+                message = tasks.get()
             except Empty:
                 break
-            if task is None:
+            if message is None:
                 shutdown()
                 break
             result, exception = None, None
-            processor, request, callback = task
+            task, callback = message
             try:
-                result = processor(request.data)
+                result = task()
             except:
                 exception = sys.exc_info()
-            cb(partial(callback, result, exception))
-            wakeup()
+            callback(result, exception)
 
     def run(self):
         shutdown_set = self._is_shutdown.is_set
@@ -63,13 +58,17 @@ class Worker(Thread):
 
 
 class Pool(object):
+    """Orchestrate workers. Start and stop them, provide new tasks."""
 
     Worker = Worker
 
-    def __init__(self, wakeup, callback, size=None):
-        tasks = self._tasks = Queue()
-        self._workers = [self.Worker(tasks, callback, wakeup)
-                         for _ in xrange(size or 1)]
+    def __init__(self, size=None):
+        self.size = size or 1
+        self._tasks = Queue()
+
+    @cached_property
+    def _workers(self):
+        return [self.Worker(self._tasks) for i in xrange(self.size)]
 
     def put(self, task):
         self._tasks.put_nowait(task)
@@ -86,63 +85,23 @@ class Pool(object):
 
 
 class ThreadsWorker(BaseWorker):
-    """Process all request in threadpool."""
-
-    def __init__(self):
-        # Store worker's replies here.
-        self._outgoing = deque()
-        super(ThreadsWorker, self).__init__()
-
-    @cached_property
-    def _prepare_handle(self):
-        return Prepare(self.loop)
-
-    @cached_property
-    def _async_handle(self):
-        return Async(self.loop, lambda handle: None)
+    """Process all request in thread-pool."""
 
     @cached_property
     def _pool(self):
-        return Pool(wakeup=self._async_handle.send,
-                    callback=self._outgoing.append,
-                    size=self.app.pool_size)
+        return Pool(self.app.pool_size)
 
-    def _before_iteration(self, handle):
-        """Should be used to run callbacks in loop's thread. callbacks
-        provided by worker threads."""
-        outgoing = self._outgoing
-        while True:
-            try:
-                callback = outgoing.popleft()
-            except IndexError:
-                break
-            else:
-                callback()
-
-    def create_consumer(self, processor):
-        create_callback = self.create_callback
+    def create_consumer(self):
         pool = self._pool
+        execute = self.app.loop_container.callback
 
-        def inner_consumer(request):
-            pool.put((processor, request, create_callback(request)))
+        def inner_consumer(task, callback):
+            pool.put((task, lambda *args: execute(callback, *args)))
 
         return inner_consumer
 
-    @in_loop
-    def _loop_setup(self):
-        """Start pyuv handles."""
-        self._prepare_handle.start(self._before_iteration)
-
     def start(self):
-        self._loop_setup()
         self._pool.start()
-
-    @in_loop
-    def _loop_teardown(self):
-        """Stop pyuv handles."""
-        self._async_handle.close()
-        self._prepare_handle.close()
 
     def stop(self):
         self._pool.stop()
-        self._loop_teardown()
