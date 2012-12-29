@@ -5,7 +5,6 @@ import sys
 from functools import wraps
 
 import six
-from pyuv import Async
 
 from thriftworker.state import current_app
 
@@ -30,8 +29,7 @@ class in_loop(object):
             event = current_app.env.RealEvent()
             d = {'result': None, 'exception': None}
 
-            def inner_callback(handle):
-                handle.close()
+            def inner_callback():
                 try:
                     d['result'] = method(*args, **kwargs)
                 except:
@@ -39,9 +37,7 @@ class in_loop(object):
                 finally:
                     event.set()
 
-            handle = Async(current_app.loop, inner_callback)
-            handle.send()
-            current_app.loop_container.wakeup()
+            current_app.loop_container.callback(inner_callback)
             try:
                 if not event.wait(self.__timeout):
                     raise Exception('Timeout happened when calling method'
@@ -49,8 +45,6 @@ class in_loop(object):
                                     .format(self.__name__, obj))
             finally:
                 event.clear()
-                if handle.active:
-                    handle.close()
 
             if d['exception'] is not None:
                 exc_type, exc, tb = d['exception']

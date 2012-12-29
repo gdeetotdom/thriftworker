@@ -14,7 +14,7 @@ class Worker(BaseWorker):
         self.consumer = consumer
         super(Worker, self).__init__()
 
-    def create_consumer(self, processor):
+    def create_consumer(self):
         return self.consumer
 
 
@@ -28,18 +28,17 @@ class TestBaseWorker(WorkerMixin, TestCase):
         return worker
 
     def test_producer(self):
-        connection, data, request_id = object(), object(), object()
+        connection, data, request_id = \
+            object(), object(), object()
         with start_stop_ctx(self.create_worker()) as worker:
             producer = worker.create_producer(self.service_name)
             producer(connection, data, request_id)
             consumer = worker.consumer
             self.assertEqual(1, consumer.call_count)
             args, kwargs = consumer.call_args
-            request = args[0]
-            self.assertIsInstance(request, self.Worker.Request)
-            self.assertIs(connection, request.connection)
-            self.assertIs(data, request.data)
-            self.assertIs(request_id, request.request_id)
+            self.assertEqual(2, len(args))
+            self.assertTrue(callable(args[0]))
+            self.assertTrue(callable(args[1]))
 
     def test_callback(self):
         connection, data, request_id, result = \

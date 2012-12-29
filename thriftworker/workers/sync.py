@@ -17,14 +17,11 @@ class SyncWorker(BaseWorker):
     def pool(self):
         return ThreadPool(self.loop)
 
-    def create_consumer(self, processor):
-        create_callback = self.create_callback
+    def create_consumer(self):
         pool = self.pool
 
-        def inner_consumer(request):
-            # Nested function that process incoming request.
-            task = lambda: processor(request.data)
-            # Put task to pool.
-            pool.queue_work(task, create_callback(request))
+        def inner_consumer(task, callback):
+            """Nested function that process incoming request."""
+            pool.queue_work(task, callback)
 
         return inner_consumer

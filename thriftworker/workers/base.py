@@ -34,20 +34,23 @@ class BaseWorker(with_metaclass(ABCMeta, LoopMixin)):
         return inner_callback
 
     @abstractmethod
-    def create_consumer(self, processor):
+    def create_consumer(self):
         raise NotImplementedError()
 
     def create_producer(self, service):
         """Create producer for connections."""
         Request = self.Request
+        create_callback = self.create_callback
         processor = self.app.services.create_processor(service)
-        consume = self.create_consumer(processor)
+        consume = self.create_consumer()
 
         def inner_producer(connection, data, request_id):
             """Enqueue given request to thread pool."""
-            consume(Request(connection=connection,
-                            data=data,
-                            request_id=request_id))
+            request = Request(connection=connection, data=data,
+                              request_id=request_id)
+            task = lambda: processor(request.data)
+            callback = create_callback(request)
+            consume(task, callback)
 
         return inner_producer
 
