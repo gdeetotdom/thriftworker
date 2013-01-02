@@ -132,6 +132,9 @@ modules = {
                  os.path.join(here, 'src', 'cm_heap.c')],
         extra_compile_args=['-std=c99'],
     ),
+    'utils.atomics': dict(
+        extra_compile_args=['-std=c99'],
+    ),
 }
 
 # collect extensions
