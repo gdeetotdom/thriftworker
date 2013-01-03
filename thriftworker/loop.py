@@ -95,7 +95,7 @@ class LoopContainer(LoopMixin):
     def _close_handlers(self):
         """Close all stale handlers."""
         def cb_handle(handle):
-            if not handle.closed:
+            if not getattr(handle, 'bypass', False) and not handle.closed:
                 logger.debug('Close stale handle %r', handle)
                 handle.close()
         self.loop.walk(cb_handle)

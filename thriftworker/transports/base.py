@@ -10,7 +10,7 @@ from pyuv.errno import strerror
 from six import with_metaclass
 
 from thriftworker.constants import BACKLOG_SIZE
-from thriftworker.utils.mixin import LoopMixin
+from thriftworker.utils.mixin import LoopMixin, StartStopMixin
 from thriftworker.utils.loop import in_loop
 from thriftworker.utils.decorators import cached_property
 
@@ -56,6 +56,7 @@ class Connections(object):
 
 
 class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
+    """Accept incoming connections."""
 
     Connections = Connections
 
@@ -72,6 +73,7 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
 
     @cached_property
     def _socket(self):
+        """Create socket from given descriptor."""
         socket = self.app.env.socket
         sock = socket.fromfd(self.descriptor, socket.AF_INET,
                              socket.SOCK_STREAM)
@@ -96,7 +98,8 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
         """Is current acceptor active."""
         return self._poller.active
 
-    def create_acceptor(self):
+    @cached_property
+    def acceptor(self):
         """Return function that should accept new connections."""
         loop = self.loop
         service = self.name
@@ -109,7 +112,7 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
             """Callback called when connection closed."""
             connections.remove(connection)
 
-        def accept_connection(handle, events, error):
+        def inner_acceptor(handle, events, error):
             """Function that try to accept new connection."""
             if error:  # pragma: no cover
                 logger.error('Error handling new connection for'
@@ -125,15 +128,17 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                                              on_close)
                 connections.register(connection)
 
-        return accept_connection
+        return inner_acceptor
 
     @in_loop
     def start(self):
+        """Start acceptor if active."""
         if not self.active:
-            self._poller.start(UV_READABLE, self.create_acceptor())
+            self._poller.start(UV_READABLE, self.acceptor)
 
     @in_loop
     def stop(self):
+        """Stop acceptor if active."""
         if self.active:
             self._poller.stop()
 
@@ -145,7 +150,7 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
         self._socket.close()
 
 
-class Acceptors(LoopMixin):
+class Acceptors(StartStopMixin, LoopMixin):
     """Maintain pool of acceptors. Start them when needed."""
 
     def __init__(self):
@@ -166,18 +171,17 @@ class Acceptors(LoopMixin):
         self._acceptors[name] = self.Acceptor(name, fd, backlog=backlog)
 
     def start_by_name(self, name):
+        """Start acceptor by name."""
         acceptor = self._acceptors[name]
         self.app.loop_container.callback(acceptor.start)
 
     def stop_by_name(self, name):
+        """Stop acceptor by name."""
         acceptor = self._acceptors[name]
         self.app.loop_container.callback(acceptor.stop)
 
     @in_loop
-    def start(self):
-        pass
-
-    @in_loop
     def stop(self):
+        """Close all registered acceptors."""
         for acceptor in self._acceptors.values():
             acceptor.close()
