@@ -132,7 +132,10 @@ modules = {
                  os.path.join(here, 'src', 'cm_heap.c')],
         extra_compile_args=['-std=c99'],
     ),
-    'utils.atomics': dict(
+    'utils.atomics.integer': dict(
+        extra_compile_args=['-std=c99'],
+    ),
+    'utils.atomics.boolean': dict(
         extra_compile_args=['-std=c99'],
     ),
 }

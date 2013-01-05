@@ -1,14 +1,12 @@
 """Some wrappers around sync."""
+from libc.stdint cimport int64_t
+
+from .boolean import AtomicBoolean
 
 
 cdef extern from "stdbool.h":
 
-    ctypedef unsigned int bool
-
-
-cdef extern from "stdint.h":
-
-    ctypedef unsigned int int64_t
+    ctypedef unsigned short bool
 
 
 cdef extern from *:
@@ -101,10 +99,17 @@ cdef class AtomicInteger(object):
 
 
 cdef class ContextCounter(AtomicInteger):
+    """Count currently executing context."""
+
+    cdef readonly int64_t limit
+    cdef readonly object reached
+
+    def __init__(self):
+        self.reached = AtomicBoolean(False)
+        AtomicInteger.__init__(self)
 
     def __enter__(self):
-        self.incr()
-        return self
+        return self.incr()
 
     def __exit__(self, type, value, tb):
         self.decr()

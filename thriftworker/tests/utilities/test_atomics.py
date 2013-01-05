@@ -28,6 +28,8 @@ class TestAtomicInteger(TestCase):
     def test_set(self):
         self.integer.set(5)
         self.assertEqual(5, self.integer.get())
+        with self.assertRaises(TypeError):
+            self.integer.set(None)
 
     def test_add(self):
         self.integer.add(5)

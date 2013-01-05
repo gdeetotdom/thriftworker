@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import socket
 import errno
 import logging
 from contextlib import contextmanager
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def ignore_eagain(socket):
+def ignore_eagain():
     """Ignore all *EAGAIN* errors in context."""
     try:
         yield
@@ -104,9 +105,10 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
         loop = self.loop
         service = self.name
         connections = self._connections
-        producer = self.app.worker.create_producer(service)
-        socket = self.app.env.socket
         listen_sock = self._socket
+        worker = self.app.worker
+        producer = worker.create_producer(service)
+        concurrency = worker.concurrency
 
         def on_close(connection):
             """Callback called when connection closed."""
@@ -118,7 +120,9 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                 logger.error('Error handling new connection for'
                              ' service %r: %s', service, strerror(error))
                 return
-            with ignore_eagain(socket):
+            if concurrency.reached:
+                return
+            with ignore_eagain():
                 sock, addr = listen_sock.accept()
                 # Disable Nagle's algorithm for socket.
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -179,6 +183,16 @@ class Acceptors(StartStopMixin, LoopMixin):
         """Stop acceptor by name."""
         acceptor = self._acceptors[name]
         self.app.loop_container.callback(acceptor.stop)
+
+    def start_accepting(self):
+        """Start all registered acceptors if needed."""
+        for acceptor in self._acceptors.values():
+            acceptor.start()
+
+    def stop_accepting(self):
+        """Stop all registered acceptors if needed."""
+        for acceptor in self._acceptors.values():
+            acceptor.stop()
 
     @in_loop
     def stop(self):

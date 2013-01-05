@@ -8,6 +8,8 @@ from functools import partial
 from six import with_metaclass
 
 from thriftworker.utils.mixin import LoopMixin, StartStopMixin
+from thriftworker.utils.atomics import ContextCounter
+from thriftworker.utils.decorators import cached_property
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +19,20 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
     #: Store request in this tuple.
     Request = namedtuple('Request', 'connection data request_id')
 
+    def __init__(self, pool_size):
+        self.pool_size = pool_size
+        super(BaseWorker, self).__init__()
+
     def create_callback(self, request):
         """Create callback that should be called after request was done."""
         connection = request.connection
         request_id = request.request_id
+        pool_size = self.pool_size
+        concurrency = self.concurrency
+        acceptors = self.app.acceptors
 
         def inner_callback(result, exception=None):
+            """Process task result."""
             if exception is None:
                 success, response = True, result
             else:
@@ -30,6 +40,10 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                 success, response = False, ''
             if connection.is_waiting():
                 connection.ready(success, response, request_id)
+            if concurrency.reached and pool_size > concurrency:
+                logger.debug('Start registered acceptors...')
+                acceptors.start_accepting()
+                concurrency.reached.clean()
 
         return inner_callback
 
@@ -37,22 +51,32 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
     def create_consumer(self):
         raise NotImplementedError()
 
+    @cached_property
+    def concurrency(self):
+        """How many tasks executed in parallel?"""
+        return ContextCounter()
+
     def create_task(self, processor):
         """Create new task for given processor."""
+        concurrency = self.concurrency
 
         def inner_task(request):
             """Process incoming request with given processor."""
-            return processor(request.data)
+            with concurrency:
+                return processor(request.data)
 
         return inner_task
 
     def create_producer(self, service):
         """Create producer for connections."""
         Request = self.Request
+        concurrency = self.concurrency
+        pool_size = self.pool_size
         create_callback = self.create_callback
         processor = self.app.services.create_processor(service)
         task = self.create_task(processor)
         consume = self.create_consumer()
+        acceptors = self.app.acceptors
 
         def inner_producer(connection, data, request_id):
             """Enqueue given request to thread pool."""
@@ -62,5 +86,9 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
             curried_task = partial(task, request)
             callback = create_callback(request)
             consume(curried_task, callback)
+            if not concurrency.reached and pool_size <= concurrency:
+                logger.debug('Stop registered acceptors...')
+                concurrency.reached.set()
+                acceptors.stop_accepting()
 
         return inner_producer
