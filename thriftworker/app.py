@@ -6,7 +6,6 @@ Distribute thrift requests between workers.
 from __future__ import absolute_import
 
 import logging
-from collections import defaultdict
 
 from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
@@ -20,7 +19,7 @@ from .services import Services
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
 from .utils.env import detect_environment
-from .utils.stats import Counter, Timer
+from .utils.stats import Counters, Timers
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +34,8 @@ class ThriftWorker(SubclassMixin):
 
     def __init__(self, loop=None, protocol_factory=None, port_range=None,
                  pool_size=None):
-        self.counters = defaultdict(Counter)
-        self.timers = defaultdict(Timer)
+        self.counters = Counters()
+        self.timers = Timers()
         # Set provided instance if we can.
         if loop is not None:
             self.loop = loop

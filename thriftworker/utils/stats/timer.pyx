@@ -36,7 +36,7 @@ cdef extern from "cm_timer.h":
     double timer_max(timer *c_timer)
 
 
-cdef class Timer:
+cdef class Timer(object):
     cdef timer *_c_timer
     cdef object quantiles
 

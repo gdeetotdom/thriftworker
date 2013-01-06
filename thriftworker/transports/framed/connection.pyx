@@ -3,7 +3,8 @@ from struct import Struct
 from sys import maxint
 
 cimport cython
-from six import next, BytesIO
+from six import next
+from cStringIO import StringIO
 from pyuv.errno import strerror, UV_EOF
 
 from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
@@ -32,7 +33,7 @@ cdef class Connection:
         self.recv_bytes = self.message_length = 0
         self.status = WAIT_LEN
         self.struct = Struct(LENGTH_FORMAT)
-        self.message_buffer = BytesIO()
+        self.message_buffer = StringIO()
         self.incoming_buffer = None
 
         # Create request id generator.
@@ -202,9 +203,9 @@ cdef class Connection:
                 # Change state to needed.
                 self.status = WAIT_ANSWER if not self.left_buffer else WAIT_LEN
                 # Send message to workers.
-                self.producer(self, self.message_buffer.getvalue(), request_id)
+                self.producer(self, self.message_buffer, request_id)
                 # Reset message buffer.
-                self.message_buffer = BytesIO()
+                self.message_buffer = StringIO()
             else:
                 # Socket was closed while we wait for answer.
                 self.close()

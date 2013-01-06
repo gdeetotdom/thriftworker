@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
 
     #: Store request in this tuple.
-    Request = namedtuple('Request', 'connection data request_id')
+    Request = namedtuple('Request', ('connection', 'message_buffer',
+                                     'request_id', 'service',
+                                     'start_time'))
 
     def __init__(self, pool_size):
         self.pool_size = pool_size
@@ -30,11 +32,17 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         pool_size = self.pool_size
         concurrency = self.concurrency
         acceptors = self.app.acceptors
+        counters = self.app.counters
+        timers = self.app.timers
+        loop = self.app.loop
 
         def inner_callback(result, exception=None):
             """Process task result."""
             if exception is None:
-                success, response = True, result
+                success, (method, response) = True, result
+                key = (request.service, method)
+                counters[key] += 1
+                timers[key] += loop.now() - request.start_time
             else:
                 logger.error(exception[1], exc_info=exception)
                 success, response = False, ''
@@ -63,7 +71,7 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         def inner_task(request):
             """Process incoming request with given processor."""
             with concurrency:
-                return processor(request.data)
+                return processor(request.message_buffer)
 
         return inner_task
 
@@ -77,12 +85,15 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         task = self.create_task(processor)
         consume = self.create_consumer()
         acceptors = self.app.acceptors
+        loop = self.app.loop
 
-        def inner_producer(connection, data, request_id):
+        def inner_producer(connection, message_buffer, request_id):
             """Enqueue given request to thread pool."""
             request = Request(connection=connection,
-                              data=data,
-                              request_id=request_id)
+                              message_buffer=message_buffer,
+                              request_id=request_id,
+                              service=service,
+                              start_time=loop.now())
             curried_task = partial(task, request)
             callback = create_callback(request)
             consume(curried_task, callback)
