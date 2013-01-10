@@ -14,6 +14,7 @@ from thriftworker.constants import BACKLOG_SIZE
 from thriftworker.utils.mixin import LoopMixin, StartStopMixin
 from thriftworker.utils.loop import in_loop
 from thriftworker.utils.decorators import cached_property
+from thriftworker.utils.waiting import wait
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,12 @@ class Connections(object):
     def __len__(self):
         return len(self.connections)
 
+    def __iter__(self):
+        return iter(self.connections)
+
+    def __repr__(self):
+        return repr(self.connections)
+
     def register(self, connection):
         """Register new connection."""
         self.connections.add(connection)
@@ -53,6 +60,8 @@ class Connections(object):
         while connections:
             connection = connections.pop()
             if not connection.is_closed():
+                logger.warn('Connection %r closed in worker shutdown',
+                            connection)
                 connection.close()
 
 
@@ -194,8 +203,12 @@ class Acceptors(StartStopMixin, LoopMixin):
         for acceptor in self._acceptors.values():
             acceptor.stop()
 
-    @in_loop
     def stop(self):
         """Close all registered acceptors."""
+        self.stop_accepting()
+        # wait for unclosed connections
+        wait(lambda: all(acceptor.connections_number == 0
+                         for acceptor in self._acceptors.values()),
+             timeout=5.0)
         for acceptor in self._acceptors.values():
             acceptor.close()
