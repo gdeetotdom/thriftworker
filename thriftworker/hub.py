@@ -247,7 +247,7 @@ class Hub(LoopMixin):
 
     def switch(self):
         """Switch into the loop's greenlet."""
-        self._greenlet.switch()
+        return self._greenlet.switch()
 
     def spawn(self, *args, **kwargs):
         """Return a new :class:`Greenlet` object, scheduled to start.
