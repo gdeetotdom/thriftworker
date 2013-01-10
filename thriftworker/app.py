@@ -14,7 +14,7 @@ from . import constants
 from .transports.base import Acceptors
 from .state import set_current_app, get_current_app
 from .listener import Listener, Listeners
-from .loop import LoopContainer
+from .hub import Hub
 from .services import Services
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
@@ -97,14 +97,14 @@ class ThriftWorker(SubclassMixin):
         return Loop.default_loop()
 
     @cached_property
-    def LoopContainer(self):
-        """Create bounded :class:`LoopContainer` class."""
-        return self.subclass_with_self(LoopContainer)
+    def Hub(self):
+        """Create bounded :class:`Hub` class."""
+        return self.subclass_with_self(Hub)
 
     @cached_property
-    def loop_container(self):
+    def hub(self):
         """Instance of bounded :class:`LoopContainer`."""
-        return self.LoopContainer()
+        return self.Hub()
 
     @property
     def env_cls(self):

@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 
 class GeventWorker(BaseWorker):
 
-    def __init__(self):
+    def __init__(self, pool_size=None):
         self._incoming = deque()
         self._outgoing = deque()
-        super(GeventWorker, self).__init__()
+        super(GeventWorker, self).__init__(pool_size)
 
     @cached_property
     def _pool(self):
-        return Pool(size=self.app.pool_size)
+        return Pool(size=self.pool_size)
 
     @cached_property
     def _worker_prepare_handle(self):
@@ -33,7 +33,7 @@ class GeventWorker(BaseWorker):
         return get_hub().loop.async()
 
     def create_consumer(self):
-        execute = self.app.loop_container.callback
+        execute = self.app.hub.callback
         incoming = self._incoming
         async = self._worker_async_handle
 

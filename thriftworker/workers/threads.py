@@ -93,7 +93,7 @@ class ThreadsWorker(BaseWorker):
 
     def create_consumer(self):
         pool = self._pool
-        execute = self.app.loop_container.callback
+        execute = self.app.hub.callback
 
         def inner_consumer(task, callback):
             pool.put((task, lambda *args: execute(callback, *args)))

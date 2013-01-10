@@ -1,6 +1,14 @@
 envs Package
 ============
 
+:mod:`_event` Module
+--------------------
+
+.. automodule:: thriftworker.envs._event
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 :mod:`base` Module
 ------------------
 
@@ -13,14 +21,6 @@ envs Package
 -------------------
 
 .. automodule:: thriftworker.envs.green
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-:mod:`mutex` Module
--------------------
-
-.. automodule:: thriftworker.envs.mutex
     :members:
     :undoc-members:
     :show-inheritance:

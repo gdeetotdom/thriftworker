@@ -177,12 +177,12 @@ class Acceptors(StartStopMixin, LoopMixin):
     def start_by_name(self, name):
         """Start acceptor by name."""
         acceptor = self._acceptors[name]
-        self.app.loop_container.callback(acceptor.start)
+        self.app.hub.callback(acceptor.start)
 
     def stop_by_name(self, name):
         """Stop acceptor by name."""
         acceptor = self._acceptors[name]
-        self.app.loop_container.callback(acceptor.stop)
+        self.app.hub.callback(acceptor.stop)
 
     def start_accepting(self):
         """Start all registered acceptors if needed."""

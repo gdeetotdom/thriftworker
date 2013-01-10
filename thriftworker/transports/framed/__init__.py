@@ -7,4 +7,5 @@ from .connection import Connection
 
 class FramedAcceptor(BaseAcceptor):
 
+    #: Which connection should we use?
     Connection = Connection

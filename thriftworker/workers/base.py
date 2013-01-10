@@ -21,8 +21,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                                      'request_id', 'service',
                                      'start_time'))
 
-    def __init__(self, pool_size):
-        self.pool_size = pool_size
+    def __init__(self, pool_size=None):
+        self.pool_size = pool_size or 10
         super(BaseWorker, self).__init__()
 
     def create_callback(self, request):
