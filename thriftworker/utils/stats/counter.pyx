@@ -26,7 +26,7 @@ cdef extern from "cm_counter.h":
     double counter_max(counter *c_counter)
 
 
-cdef class Counter:
+cdef class Counter(object):
     cdef counter *_c_counter
 
     def __cinit__(self):

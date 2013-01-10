@@ -42,14 +42,15 @@ class TestBaseWorker(WorkerMixin, TestCase):
 
     def test_callback(self):
         connection, data, request_id, result = \
-            Mock(), object(), object(), object()
+            Mock(), object(), object(), (None, object())
         connection.is_waiting.return_value = True
         with start_stop_ctx(self.create_worker()) as worker:
-            request = self.Worker.Request(connection, data, request_id)
+            request = self.Worker.Request(connection, data, request_id,
+                                          self.service_name, 0)
             callback = worker.create_callback(request)
             callback(result)
             self.assertEqual(1, connection.ready.call_count)
             args, kwargs = connection.ready.call_args
             self.assertTrue(args[0])
-            self.assertIs(result, args[1])
+            self.assertIs(result[1], args[1])
             self.assertIs(request_id, args[2])

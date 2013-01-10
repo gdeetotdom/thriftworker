@@ -65,3 +65,11 @@ utils Package
     :undoc-members:
     :show-inheritance:
 
+Subpackages
+-----------
+
+.. toctree::
+
+    thriftworker.utils.atomics
+    thriftworker.utils.stats
+

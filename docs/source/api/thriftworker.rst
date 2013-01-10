@@ -33,18 +33,18 @@ thriftworker Package
     :undoc-members:
     :show-inheritance:
 
-:mod:`listener` Module
-----------------------
+:mod:`hub` Module
+-----------------
 
-.. automodule:: thriftworker.listener
+.. automodule:: thriftworker.hub
     :members:
     :undoc-members:
     :show-inheritance:
 
-:mod:`loop` Module
-------------------
+:mod:`listener` Module
+----------------------
 
-.. automodule:: thriftworker.loop
+.. automodule:: thriftworker.listener
     :members:
     :undoc-members:
     :show-inheritance:

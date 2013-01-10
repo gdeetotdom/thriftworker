@@ -49,12 +49,12 @@ class Services(object):
         service = self.services[service_name]
         proto_factory, processor = service.proto_factory, service.processor
 
-        def inner_processor(payload):
-            in_transport = TMemoryBuffer(payload)
+        def inner_processor(message_buffer):
+            in_transport = TMemoryBuffer(message_buffer.getvalue())
             out_transport = TMemoryBuffer()
             in_prot = proto_factory.getProtocol(in_transport)
             out_prot = proto_factory.getProtocol(out_transport)
-            processor.process(in_prot, out_prot)
-            return out_transport.getvalue()
+            method = processor.process(in_prot, out_prot)
+            return (method, out_transport.getvalue())
 
         return inner_processor

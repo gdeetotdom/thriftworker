@@ -37,7 +37,7 @@ class in_loop(object):
                 finally:
                     event.set()
 
-            current_app.loop_container.callback(inner_callback)
+            current_app.hub.callback(inner_callback)
             try:
                 if not event.wait(self.__timeout):
                     raise Exception('Timeout happened when calling method'

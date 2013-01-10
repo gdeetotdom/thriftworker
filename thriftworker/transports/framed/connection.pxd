@@ -27,6 +27,7 @@ cdef class Connection:
     cdef object client
     cdef object loop
     cdef object sock
+    cdef object peer
     cdef object on_close
 
     cdef inline object next_request_id(self)

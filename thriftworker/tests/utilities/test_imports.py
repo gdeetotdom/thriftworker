@@ -28,8 +28,8 @@ class TestSymbolByName(TestCase):
             symbol_by_name('thriftworker:ThriftWorker', imp=imp)
 
     def test_package(self):
-        from thriftworker.loop import LoopContainer
-        self.assertIs(symbol_by_name('.loop:LoopContainer',
-                    package='thriftworker'), LoopContainer)
+        from thriftworker.hub import Hub
+        self.assertIs(symbol_by_name('.hub:Hub',
+                    package='thriftworker'), Hub)
         self.assertTrue(symbol_by_name(':ThriftWorker',
                                        package='thriftworker'))
