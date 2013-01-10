@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+from cStringIO import StringIO
+
 from mock import Mock
 
 from thriftworker.tests.utils import StartStopLoopMixin, start_stop_ctx
@@ -18,7 +20,7 @@ class WorkerMixin(StartStopLoopMixin):
         self.app.services.register(service_name, processor)
 
     def check_request(self, worker):
-        connection, data, request_id = Mock(), '', 1
+        connection, data, request_id = Mock(), StringIO(''), 1
         with start_stop_ctx(worker):
             producer = worker.create_producer(self.service_name)
             producer(connection, data, request_id)

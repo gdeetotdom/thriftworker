@@ -3,7 +3,8 @@ from struct import Struct
 from sys import maxint
 
 cimport cython
-from six import next, BytesIO
+from six import next
+from cStringIO import StringIO
 from pyuv.errno import strerror, UV_EOF
 
 from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
@@ -32,7 +33,7 @@ cdef class Connection:
         self.recv_bytes = self.message_length = 0
         self.status = WAIT_LEN
         self.struct = Struct(LENGTH_FORMAT)
-        self.message_buffer = BytesIO()
+        self.message_buffer = StringIO()
         self.incoming_buffer = None
 
         # Create request id generator.
@@ -44,6 +45,7 @@ cdef class Connection:
         self.loop = loop
         self.client = client
         self.sock = sock
+        self.peer = sock.getpeername()
         self.on_close = on_close
 
         # Start watchers.
@@ -176,7 +178,8 @@ cdef class Connection:
             self.client.write(data, self.cb_write_done)
 
     cdef inline void handle_error(self, object error):
-        logger.error('Error: %s', strerror(error))
+        logger.error('Error from %s: %s', "{0[0]}:{0[1]}".format(self.peer),
+                     strerror(error))
 
     cpdef cb_read_done(self, object handle, object data, object error):
         if error:
@@ -200,9 +203,9 @@ cdef class Connection:
                 # Change state to needed.
                 self.status = WAIT_ANSWER if not self.left_buffer else WAIT_LEN
                 # Send message to workers.
-                self.producer(self, self.message_buffer.getvalue(), request_id)
+                self.producer(self, self.message_buffer, request_id)
                 # Reset message buffer.
-                self.message_buffer = BytesIO()
+                self.message_buffer = StringIO()
             else:
                 # Socket was closed while we wait for answer.
                 self.close()
@@ -227,3 +230,7 @@ cdef class Connection:
             return
 
         self.status = WAIT_LEN
+
+    def __repr__(self):
+        return ('<{0} from {2[0]}:{2[1]} at {1}>'.
+                format(self.__class__.__name__, hex(id(self)), self.peer))

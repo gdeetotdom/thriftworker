@@ -17,6 +17,16 @@ class LoopMixin(object):
         return self.app.loop
 
 
+class StartStopMixin(object):
+    """Implement some stubs method for object that can be started / stopped."""
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+
 def _unpickle_appattr(name, args):
     """Given an attribute name and a list of args, gets
     the attribute from the current app and calls it.

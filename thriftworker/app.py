@@ -14,11 +14,12 @@ from . import constants
 from .transports.base import Acceptors
 from .state import set_current_app, get_current_app
 from .listener import Listener, Listeners
-from .loop import LoopContainer
+from .hub import Hub
 from .services import Services
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
 from .utils.env import detect_environment
+from .utils.stats import Counters, Timers
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ class ThriftWorker(SubclassMixin):
 
     def __init__(self, loop=None, protocol_factory=None, port_range=None,
                  pool_size=None):
+        self.counters = Counters()
+        self.timers = Timers()
         # Set provided instance if we can.
         if loop is not None:
             self.loop = loop
@@ -94,14 +97,14 @@ class ThriftWorker(SubclassMixin):
         return Loop.default_loop()
 
     @cached_property
-    def LoopContainer(self):
-        """Create bounded :class:`LoopContainer` class."""
-        return self.subclass_with_self(LoopContainer)
+    def Hub(self):
+        """Create bounded :class:`Hub` class."""
+        return self.subclass_with_self(Hub)
 
     @cached_property
-    def loop_container(self):
+    def hub(self):
         """Instance of bounded :class:`LoopContainer`."""
-        return self.LoopContainer()
+        return self.Hub()
 
     @property
     def env_cls(self):
@@ -181,4 +184,4 @@ class ThriftWorker(SubclassMixin):
     def worker(self):
         """Create some worker routine."""
         logger.debug('Using {0!r} worker'.format(self.Worker))
-        return self.Worker()
+        return self.Worker(self.pool_size)

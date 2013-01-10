@@ -132,6 +132,12 @@ modules = {
                  os.path.join(here, 'src', 'cm_heap.c')],
         extra_compile_args=['-std=c99'],
     ),
+    'utils.atomics.integer': dict(
+        extra_compile_args=['-std=c99'],
+    ),
+    'utils.atomics.boolean': dict(
+        extra_compile_args=['-std=c99'],
+    ),
 }
 
 # collect extensions
@@ -208,7 +214,7 @@ setup(
     cmdclass=cmdclass,
     ext_modules=extensions,
     packages=find_packages(),
-    install_requires=['pyuv', 'thrift', 'six'],
+    install_requires=['pyuv', 'thrift', 'six', 'greenlet>=0.4.0'],
     classifiers=["Development Status :: 4 - Beta",
                  "Intended Audience :: Developers",
                  "Intended Audience :: System Administrators",

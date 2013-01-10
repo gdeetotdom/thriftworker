@@ -52,9 +52,9 @@ class StartStopLoopMixin(CustomAppMixin):
 
     def setUp(self):
         super(StartStopLoopMixin, self).setUp()
-        container = self.app.loop_container
-        container.start()
-        self.addCleanup(container.stop)
+        hub = self.app.hub
+        hub.start()
+        self.addCleanup(hub.stop)
 
     def wakeup_loop(self):
         event = self.app.env.RealEvent()
