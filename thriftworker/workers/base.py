@@ -82,6 +82,7 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         pool_size = self.pool_size
         create_callback = self.create_callback
         processor = self.app.services.create_processor(service)
+        counter = self.app.counters[('Internal', 'pool_overflow')]
         task = self.create_task(processor)
         consume = self.create_consumer()
         acceptors = self.app.acceptors
@@ -99,6 +100,7 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
             consume(curried_task, callback)
             if not concurrency.reached and pool_size <= concurrency:
                 logger.debug('Stop registered acceptors...')
+                counter.add()
                 concurrency.reached.set()
                 acceptors.stop_accepting()
 
