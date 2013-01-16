@@ -30,3 +30,6 @@ class SyncEnv(BaseEnv):
 
     def get_real_ident(self):
         return get_ident()
+
+    def get_ident(self):
+        return get_ident()

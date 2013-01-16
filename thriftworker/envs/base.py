@@ -19,6 +19,10 @@ class BaseEnv(with_metaclass(ABCMeta)):
     def get_real_ident(self):
         raise NotImplementedError()
 
+    @abstractmethod
+    def get_ident(self):
+        raise NotImplementedError()
+
     @abstractproperty
     def RealEvent(self):
         raise NotImplementedError()

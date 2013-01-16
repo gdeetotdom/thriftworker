@@ -146,14 +146,16 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
     @in_loop
     def start(self):
         """Start acceptor if active."""
-        if not self.active:
-            self._poller.start(UV_READABLE, self.acceptor)
+        poller = self._poller
+        if not poller.active and not poller.closed:
+            poller.start(UV_READABLE, self.acceptor)
 
     @in_loop
     def stop(self):
         """Stop acceptor if active."""
-        if self.active:
-            self._poller.stop()
+        poller = self._poller
+        if poller.active and not poller.closed:
+            poller.stop()
 
     @in_loop
     def close(self):
