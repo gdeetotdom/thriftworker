@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
-from thriftworker.tests.utils import TestCase, CustomAppMixin, start_stop_ctx
+from thriftworker.tests.utils import TestCase, CustomAppMixin, \
+    start_stop_ctx
 
 
 class TestHub(CustomAppMixin, TestCase):

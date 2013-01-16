@@ -1,6 +1,6 @@
 """Process incoming request and return it's result."""
 
-VERSION = (0, 1, 12)
+VERSION = (0, 1, 13)
 
 __version__ = '.'.join(map(str, VERSION[0:3]))
 __author__ = 'Lipin Dmitriy'

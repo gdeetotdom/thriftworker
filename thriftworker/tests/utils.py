@@ -7,11 +7,13 @@ from contextlib import contextmanager
 from unittest import TestCase as BaseTestCase
 from unittest.case import SkipTest
 
+from six import with_metaclass
 from pyuv import Loop, Async, Idle
 
 from thriftworker import state
 from thriftworker.app import ThriftWorker
 from thriftworker.utils.env import detect_environment
+from thriftworker.utils.loop import loop_delegate
 
 TIMEOUT = 5.0
 
@@ -29,6 +31,7 @@ def start_stop_ctx(container):
 
 
 class TestCase(BaseTestCase):
+    """Default test case that reset current application on each run."""
 
     def setUp(self):
         # reset current state before each run
@@ -36,6 +39,7 @@ class TestCase(BaseTestCase):
 
 
 class CustomAppMixin(object):
+    """Create application with custom loop."""
 
     def setUp(self):
         super(CustomAppMixin, self).setUp()
@@ -49,6 +53,7 @@ class CustomAppMixin(object):
 
 
 class StartStopLoopMixin(CustomAppMixin):
+    """Ensure that hub will started be started before tests run."""
 
     def setUp(self):
         super(StartStopLoopMixin, self).setUp()
@@ -94,3 +99,23 @@ def custom_env_needed(env):
         return test_item
 
     return inner_decorator
+
+
+class GreenMeta(type):
+
+    def __new__(meta, classname, bases, attrs):
+        for key, value in attrs.items():
+            if key.startswith('test') and callable(value):
+                attrs.pop(key)
+                attrs[key] = loop_delegate(value)
+        return type.__new__(meta, classname, bases, attrs)
+
+
+class GreenTest(CustomAppMixin, with_metaclass(GreenMeta, TestCase)):
+    """Ensure that all methods will be executed in loop."""
+
+    def setUp(self):
+        super(GreenTest, self).setUp()
+        hub = self.hub = self.app.hub
+        hub.start()
+        self.addCleanup(hub.stop)

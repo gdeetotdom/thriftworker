@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from gevent.event import Event
 from gevent.coros import RLock
-from gevent.thread import start_new_thread
+from gevent.thread import start_new_thread, get_ident
 
 from thriftworker.utils.imports import get_real_module
 from thriftworker.utils.decorators import cached_property
@@ -48,3 +48,6 @@ class GeventEnv(BaseEnv):
 
     def start_thread(self, func, args=None, kwargs=None):
         return start_new_thread(func, args or (), kwargs or {})
+
+    def get_ident(self):
+        return get_ident()
