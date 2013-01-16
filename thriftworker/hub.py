@@ -8,9 +8,10 @@ from functools import partial
 
 from six import PY3
 from greenlet import greenlet, getcurrent, GreenletExit
-from pyuv import Async, Prepare
+from pyuv import Async, Prepare, Timer
 from pyuv.error import HandleError
 
+from .state import current_app
 from .utils.loop import in_loop
 from .utils.mixin import LoopMixin
 from .utils.decorators import cached_property
@@ -61,6 +62,23 @@ class _dummy_event(object):
 
 
 _dummy_event = _dummy_event()
+
+
+def sleep(seconds=0):
+    """Put the current greenlet to sleep for at least *seconds*.
+
+    *seconds* may be specified as an integer, or a float if fractional seconds
+    are desired.
+
+    """
+    hub = current_app.hub
+    loop = current_app.loop
+    if seconds <= 0:
+        waiter = hub.Waiter()
+        loop.callback(waiter.switch)
+        waiter.get()
+    else:
+        hub.wait(Timer(loop), seconds, False)
 
 
 class LoopGreenlet(greenlet):
@@ -259,19 +277,38 @@ class Hub(LoopMixin):
         g.start()
         return g
 
+    def wait(self, watcher, *args, **kwargs):
+        """Wait for given watcher."""
+        waiter = self.Waiter()
+        unique = object()
+        watcher.start(lambda *args, **kwargs: partial(waiter.switch, unique),
+                      *args, **kwargs)
+        try:
+            result = waiter.get()
+            assert result is unique, \
+                'Invalid switch into %s: %r (expected %r)' % \
+                    (getcurrent(), result, unique)
+        finally:
+            watcher.stop()
+
 
 class Waiter(object):
     """A low level communication utility for greenlets.
 
-    Wrapper around greenlet's ``switch()`` and ``throw()`` calls that makes them somewhat safer:
+    Wrapper around greenlet's ``switch()`` and ``throw()`` calls that makes
+    them somewhat safer:
 
-    * switching will occur only if the waiting greenlet is executing :meth:`get` method currently;
-    * any error raised in the greenlet is handled inside :meth:`switch` and :meth:`throw`
-    * if :meth:`switch`/:meth:`throw` is called before the receiver calls :meth:`get`, then :class:`Waiter`
-      will store the value/exception. The following :meth:`get` will return the value/raise the exception.
+    * switching will occur only if the waiting greenlet is executing
+      :meth:`get` method currently;
+    * any error raised in the greenlet is handled inside :meth:`switch`
+      and :meth:`throw`
+    * if :meth:`switch`/:meth:`throw` is called before the receiver calls
+      :meth:`get`, then :class:`Waiter` will store the value/exception.
+      The following :meth:`get` will return the value/raise the exception.
 
-    The :meth:`switch` and :meth:`throw` methods must only be called from the :class:`Hub` greenlet.
-    The :meth:`get` method must be called from a greenlet other than :class:`Hub`.
+    The :meth:`switch` and :meth:`throw` methods must only be called from
+    the :class:`Hub` greenlet. The :meth:`get` method must be called from
+    a greenlet other than :class:`Hub`.
 
     """
 

@@ -49,9 +49,9 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
             if connection.is_waiting():
                 connection.ready(success, response, request_id)
             if concurrency.reached and pool_size > concurrency:
+                concurrency.reached.clean()
                 logger.debug('Start registered acceptors...')
                 acceptors.start_accepting()
-                concurrency.reached.clean()
 
         return inner_callback
 
