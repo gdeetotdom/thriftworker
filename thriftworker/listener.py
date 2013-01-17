@@ -29,6 +29,7 @@ class Listener(LoopMixin):
         self.name = name
         self.address = address
         self.backlog = backlog or BACKLOG_SIZE
+        self.started = False
         super(Listener, self).__init__()
 
     @cached_property
@@ -78,12 +79,14 @@ class Listener(LoopMixin):
             raise BindError("Service {0!r} can't bind to address {1!r}"
                             .format(self.name, self.address))
         sock.listen(self.backlog)
+        self.started = True
 
     @in_loop
     def stop(self):
         if not self.channel.closed:
             self.channel.close()
         self.socket.close()
+        self.started = False
 
 
 class Listeners(LoopMixin):
