@@ -38,26 +38,21 @@ cdef extern from "cm_timer.h":
 
 cdef class Timer(object):
     cdef timer *_c_timer
-    cdef object quantiles
+    cdef int _initialized
 
-    def __cinit__(self, double eps=0.01, object quantile=None):
+    def __cinit__(self, double eps=0.01):
         # These are the quantiles we track
-        self.quantiles = tuple(quantile or [0.5, 0.95, 0.99])
-        assert self.quantiles, 'list of quantiles empty'
-        cdef double *quantiles = []
-        for i, quantile in enumerate(self.quantiles):
-            quantiles[i] = quantile
-        cdef int num_quantiles = len(self.quantiles)
+        cdef double *quantiles = [0.5, 0.95, 0.99]
         self._c_timer = <timer *>malloc(sizeof(timer))
         if self._c_timer is NULL:
             raise MemoryError("Can't create timer struct")
-        assert init_timer(eps, quantiles, num_quantiles, self._c_timer) == 0
+        self._initialized = init_timer(eps, quantiles, 3, self._c_timer)
+        assert self._initialized == 0
 
     def add(self, double sample):
         assert timer_add_sample(self._c_timer, sample) == 0
 
     def query(self, double quantile=0.95):
-        assert quantile in self.quantiles, 'wrong quantile given'
         return timer_query(self._c_timer, quantile)
 
     def __int__(self):
@@ -125,5 +120,6 @@ cdef class Timer(object):
 
     def __dealloc__(self):
         if self._c_timer is not NULL:
-            destroy_timer(self._c_timer)
+            if self._initialized == 0:
+                destroy_timer(self._c_timer)
             free(self._c_timer)
