@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from abc import ABCMeta, abstractproperty
 
 from pyuv import Pipe, Poll, UV_READABLE
+from pyuv.error import HandleError
 from pyuv.errno import strerror
 from six import with_metaclass
 
@@ -160,7 +161,8 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
     @in_loop
     def close(self):
         """Close all resources."""
-        self._poller.close()
+        if not self._poller.closed:
+            self._poller.close()
         self._connections.close()
         self._socket.close()
 
@@ -211,6 +213,6 @@ class Acceptors(StartStopMixin, LoopMixin):
         # wait for unclosed connections
         wait(lambda: all(acceptor.connections_number == 0
                          for acceptor in self._acceptors.values()),
-             timeout=5.0)
+             timeout=30.0)
         for acceptor in self._acceptors.values():
             acceptor.close()
