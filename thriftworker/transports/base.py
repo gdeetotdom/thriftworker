@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from abc import ABCMeta, abstractproperty
 
 from pyuv import Pipe, Poll, UV_READABLE
-from pyuv.error import HandleError
 from pyuv.errno import strerror
 from six import with_metaclass
 
@@ -26,7 +25,8 @@ def ignore_eagain():
     try:
         yield
     except socket.error as exc:
-        if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK, errno.EINVAL):
+        if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK,
+                             errno.EINVAL, errno.EBADF):
             raise
 
 

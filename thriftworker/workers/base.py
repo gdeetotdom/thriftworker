@@ -50,7 +50,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                 connection.ready(success, response, request_id)
             if concurrency.reached and pool_size > concurrency:
                 concurrency.reached.clean()
-                logger.debug('Start registered acceptors...')
+                logger.debug('Start registered acceptors,'
+                             ' current concurrency: %d...', int(concurrency))
                 acceptors.start_accepting()
 
         return inner_callback
@@ -99,7 +100,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
             callback = create_callback(request)
             consume(curried_task, callback)
             if not concurrency.reached and pool_size <= concurrency:
-                logger.debug('Stop registered acceptors...')
+                logger.debug('Stop registered acceptors,'
+                             ' current concurrency: %d...', int(concurrency))
                 counter.add()
                 concurrency.reached.set()
                 acceptors.stop_accepting()
