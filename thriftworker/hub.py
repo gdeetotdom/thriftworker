@@ -208,7 +208,7 @@ class Hub(LoopMixin):
 
     def handle_error(self, exc_type, value, traceback):
         """Log in-loop errors with our logger."""
-        logger.exception(value, exc_info=(exc_type, value, traceback))
+        logger.error(value, exc_info=(exc_type, value, traceback))
 
     def _setup_loop(self, loop):
         loop.ident = self.app.env.get_real_ident()
@@ -273,6 +273,8 @@ class Hub(LoopMixin):
         The arguments are passed to :meth:`Greenlet.__init__`.
 
         """
+        assert self.app.loop.ident == self.app.env.get_real_ident(), \
+            "greenlet spawned from non-loop thread"
         g = self.Greenlet(*args, **kwargs)
         g.start()
         return g
@@ -281,8 +283,11 @@ class Hub(LoopMixin):
         """Wait for given watcher."""
         waiter = self.Waiter()
         unique = object()
-        watcher.start(lambda *args, **kwargs: partial(waiter.switch, unique),
-                      *args, **kwargs)
+
+        def inner_callback(*args):
+            waiter.switch(unique)
+
+        watcher.start(inner_callback, *args, **kwargs)
         try:
             result = waiter.get()
             assert result is unique, \
