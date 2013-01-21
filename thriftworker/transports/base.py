@@ -6,7 +6,7 @@ import logging
 from contextlib import contextmanager
 from abc import ABCMeta, abstractproperty
 
-from pyuv import Pipe, Poll, UV_READABLE
+from pyuv import Pipe, TCP, Poll, UV_READABLE
 from pyuv.errno import strerror
 from six import with_metaclass
 
@@ -17,6 +17,8 @@ from thriftworker.utils.decorators import cached_property
 from thriftworker.utils.waiting import wait
 
 logger = logging.getLogger(__name__)
+
+Handle = TCP if hasattr(TCP, 'open') else Pipe
 
 
 @contextmanager
@@ -136,7 +138,7 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                 sock, addr = listen_sock.accept()
                 # Disable Nagle's algorithm for socket.
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                client = Pipe(loop)
+                client = Handle(loop)
                 client.open(sock.fileno())
                 connection = self.Connection(producer, loop, client, sock,
                                              on_close)
