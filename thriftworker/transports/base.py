@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import socket
 import errno
 import logging
+from itertools import chain
 from contextlib import contextmanager
 from abc import ABCMeta, abstractproperty
 
@@ -111,6 +112,10 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
         """Is current acceptor active."""
         return self._poller.active
 
+    def __iter__(self):
+        """Return all registered connections."""
+        return iter(self._connections)
+
     @cached_property
     def acceptor(self):
         """Return function that should accept new connections."""
@@ -209,12 +214,18 @@ class Acceptors(StartStopMixin, LoopMixin):
         for acceptor in self._acceptors.values():
             acceptor.stop()
 
+    @property
+    def connections_number(self):
+        return sum(acceptor.connections_number for acceptor in self)
+
     def stop(self):
         """Close all registered acceptors."""
         self.stop_accepting()
         # wait for unclosed connections
-        wait(lambda: all(acceptor.connections_number == 0
-                         for acceptor in self._acceptors.values()),
-             timeout=30.0)
-        for acceptor in self._acceptors.values():
+        if self.connections_number:
+            for connection in chain.from_iterable(self):
+                logger.debug('Wait for %r...', connection)
+            if wait(lambda: self.connections_number == 0, timeout=15.0):
+                logger.debug('All connections closed...')
+        for acceptor in self:
             acceptor.close()
