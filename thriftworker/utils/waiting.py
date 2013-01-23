@@ -8,3 +8,4 @@ def wait(predicate, timeout=5.0, resolution=0.05):
     tic = time() + timeout
     while not predicate() and tic > time():
         sleep(resolution)
+    return predicate()

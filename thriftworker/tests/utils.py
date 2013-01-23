@@ -13,7 +13,7 @@ from pyuv import Loop, Async, Idle
 from thriftworker import state
 from thriftworker.app import ThriftWorker
 from thriftworker.utils.env import detect_environment
-from thriftworker.utils.loop import loop_delegate
+from thriftworker.utils.loop import greenlet_delegate
 
 TIMEOUT = 5.0
 
@@ -107,7 +107,7 @@ class GreenMeta(type):
         for key, value in attrs.items():
             if key.startswith('test') and callable(value):
                 attrs.pop(key)
-                attrs[key] = loop_delegate(value)
+                attrs[key] = greenlet_delegate(value)
         return type.__new__(meta, classname, bases, attrs)
 
 
