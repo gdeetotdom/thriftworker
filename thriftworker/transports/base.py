@@ -3,11 +3,11 @@ from __future__ import absolute_import
 import socket
 import errno
 import logging
+from itertools import chain
 from contextlib import contextmanager
 from abc import ABCMeta, abstractproperty
 
-from pyuv import Pipe, Poll, UV_READABLE
-from pyuv.error import HandleError
+from pyuv import Pipe, TCP, Poll, UV_READABLE
 from pyuv.errno import strerror
 from six import with_metaclass
 
@@ -19,6 +19,8 @@ from thriftworker.utils.waiting import wait
 
 logger = logging.getLogger(__name__)
 
+Handle = TCP if hasattr(TCP, 'open') else Pipe
+
 
 @contextmanager
 def ignore_eagain():
@@ -26,7 +28,8 @@ def ignore_eagain():
     try:
         yield
     except socket.error as exc:
-        if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK, errno.EINVAL):
+        if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK,
+                             errno.EINVAL, errno.EBADF):
             raise
 
 
@@ -109,6 +112,10 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
         """Is current acceptor active."""
         return self._poller.active
 
+    def __iter__(self):
+        """Return all registered connections."""
+        return iter(self._connections)
+
     @cached_property
     def acceptor(self):
         """Return function that should accept new connections."""
@@ -136,7 +143,7 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                 sock, addr = listen_sock.accept()
                 # Disable Nagle's algorithm for socket.
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                client = Pipe(loop)
+                client = Handle(loop)
                 client.open(sock.fileno())
                 connection = self.Connection(producer, loop, client, sock,
                                              on_close)
@@ -207,12 +214,18 @@ class Acceptors(StartStopMixin, LoopMixin):
         for acceptor in self._acceptors.values():
             acceptor.stop()
 
+    @property
+    def connections_number(self):
+        return sum(acceptor.connections_number for acceptor in self)
+
     def stop(self):
         """Close all registered acceptors."""
         self.stop_accepting()
         # wait for unclosed connections
-        wait(lambda: all(acceptor.connections_number == 0
-                         for acceptor in self._acceptors.values()),
-             timeout=30.0)
-        for acceptor in self._acceptors.values():
+        if self.connections_number:
+            for connection in chain.from_iterable(self):
+                logger.debug('Wait for %r...', connection)
+            if wait(lambda: self.connections_number == 0, timeout=15.0):
+                logger.debug('All connections closed...')
+        for acceptor in self:
             acceptor.close()
