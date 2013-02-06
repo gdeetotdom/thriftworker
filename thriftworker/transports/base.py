@@ -64,7 +64,7 @@ class Connections(object):
         while connections:
             connection = connections.pop()
             if not connection.is_closed():
-                logger.warn('Connection %r closed in worker shutdown',
+                logger.warn('Connection %r closed on worker shutdown',
                             connection)
                 connection.close()
 
@@ -224,8 +224,9 @@ class Acceptors(StartStopMixin, LoopMixin):
         # wait for unclosed connections
         if self.connections_number:
             for connection in chain.from_iterable(self):
-                logger.debug('Wait for %r...', connection)
-            if wait(lambda: self.connections_number == 0, timeout=15.0):
+                logger.info('Wait for %r...', connection)
+            if wait(lambda: self.connections_number == 0,
+                    timeout=self.app.shutdown_timeout):
                 logger.debug('All connections closed...')
         for acceptor in self:
             acceptor.close()

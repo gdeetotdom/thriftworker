@@ -33,7 +33,7 @@ class ThriftWorker(SubclassMixin):
     acceptor_cls = 'thriftworker.transports.framed:FramedAcceptor'
 
     def __init__(self, loop=None, protocol_factory=None, port_range=None,
-                 pool_size=None):
+                 pool_size=None, shutdown_timeout=None):
         self.counters = Counters()
         self.timers = Timers()
         # Set provided instance if we can.
@@ -43,6 +43,7 @@ class ThriftWorker(SubclassMixin):
             self.protocol_factory = protocol_factory
         self.port_range = port_range
         self.pool_size = pool_size
+        self.shutdown_timeout = shutdown_timeout or 30.0
         super(ThriftWorker, self).__init__()
         set_current_app(self)
 
