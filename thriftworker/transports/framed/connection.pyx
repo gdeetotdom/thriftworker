@@ -7,6 +7,7 @@ from six import next
 from cStringIO import StringIO
 from pyuv.errno import strerror, UV_EOF
 
+from thriftworker.utils.stats import Counter
 from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
 
 logger = getLogger(__name__)
@@ -38,7 +39,7 @@ cdef class Connection:
 
         # Create request id generator.
         self.request_id = 0
-        self.request_id_generator = iter(xrange(maxint // 2))
+        self.request_counter = Counter()
 
         # Given arguments.
         self.producer = producer
@@ -53,12 +54,8 @@ cdef class Connection:
 
     @cython.profile(False)
     cdef inline object next_request_id(self):
-        """Returns ``True`` if source is writable."""
-        try:
-            request_id = self.request_id = next(self.request_id_generator)
-        except StopIteration:
-            generator = self.request_id_generator = iter(xrange(maxint // 2))
-            request_id = self.request_id = next(generator)
+        self.request_counter.add()
+        request_id = self.request_id = self.request_counter.count
         return request_id
 
     @cython.profile(False)
@@ -167,7 +164,7 @@ cdef class Connection:
         message_length = self.message_length = len(message)
 
         if message_length == 0:
-            # it was a oneway request, do not write answer
+            # it was a one way request, do not write answer
             self.status = WAIT_LEN
         else:
             # Create message.
@@ -200,7 +197,7 @@ cdef class Connection:
             elif not self.is_waiting():
                 # Grow up request id.
                 request_id = self.next_request_id()
-                # Change state to needed.
+                # Change state to needed if some data left in buffer.
                 self.status = WAIT_ANSWER if not self.left_buffer else WAIT_LEN
                 # Send message to workers.
                 self.producer(self, self.message_buffer, request_id)

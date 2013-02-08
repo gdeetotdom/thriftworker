@@ -19,7 +19,7 @@ cdef class Connection:
     cdef object message_buffer
     cdef object incoming_buffer
     cdef object left_buffer
-    cdef object request_id_generator
+    cdef object request_counter
     cdef object request_id
 
     # Given arguments.

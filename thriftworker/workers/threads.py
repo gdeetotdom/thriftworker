@@ -14,12 +14,13 @@ logger = logging.getLogger(__name__)
 class Worker(Thread):
     """Simple threaded worker."""
 
-    def __init__(self, tasks):
+    def __init__(self, tasks, shutdown_timeout=None):
         super(Worker, self).__init__()
         self.daemon = True
         self.tasks = tasks
         self._is_shutdown = Event()
         self._is_stopped = Event()
+        self.shutdown_timeout = shutdown_timeout or 5.0
 
     def body(self):
         """Consume messages from queue and execute them until empty message
@@ -40,7 +41,7 @@ class Worker(Thread):
             task, callback = message
             try:
                 result = task()
-            except:
+            except Exception:
                 exception = sys.exc_info()
             callback(result, exception)
 
@@ -54,7 +55,7 @@ class Worker(Thread):
             self._is_stopped.set()
 
     def wait(self):
-        self._is_stopped.wait()
+        self._is_stopped.wait(self.shutdown_timeout)
 
 
 class Pool(object):
