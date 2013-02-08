@@ -57,15 +57,14 @@ class Connections(object):
         try:
             self.connections.remove(connection)
         except KeyError:
-            logger.warning('Connection %r not registered', connection)
+            pass
 
     def close(self):
         connections = self.connections
         while connections:
             connection = connections.pop()
             if not connection.is_closed():
-                logger.warn('Connection %r closed on worker shutdown',
-                            connection)
+                logger.warn('Connection %r closed prematurely', connection)
                 connection.close()
 
 
