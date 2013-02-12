@@ -175,8 +175,8 @@ cdef class Connection:
             self.client.write(data, self.cb_write_done)
 
     cdef inline void handle_error(self, object error):
-        logger.error('Error from %s: %s', "{0[0]}:{0[1]}".format(self.peer),
-                     strerror(error))
+        logger.warn('Error from %s: %s', "{0[0]}:{0[1]}".format(self.peer),
+                    strerror(error))
 
     cpdef cb_read_done(self, object handle, object data, object error):
         if error:

@@ -42,14 +42,19 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                 success, (method, response) = True, result
                 key = (request.service, method)
                 counters[key] += 1
-                timers[key] += loop.now() - request.start_time
+                took = loop.now() - request.start_time
+                timers[key] += took
             else:
                 logger.error(exception[1], exc_info=exception)
                 success, response = False, ''
             if connection.is_waiting():
                 connection.ready(success, response, request_id)
+            elif exception is None:
+                logger.warn('%r not ready for answer, method %s:%s took %d ms',
+                            connection, request.service, method, int(took))
             else:
-                logger.warn('Connection %s not ready for answer', connection)
+                logger.warn('%r not ready for answer, exception happened in %s',
+                            connection, request.service)
             if concurrency.reached and pool_size > concurrency:
                 concurrency.reached.clean()
                 logger.debug('Start registered acceptors,'
