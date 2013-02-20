@@ -8,13 +8,14 @@ from functools import partial
 
 from six import PY3
 from greenlet import greenlet, getcurrent, GreenletExit
-from pyuv import Async, Prepare, Timer
+from pyuv import Async, Timer
 from pyuv.error import HandleError
 
 from .state import current_app
 from .utils.loop import in_loop
 from .utils.mixin import LoopMixin
 from .utils.decorators import cached_property
+from .utils.queue import AsyncQueue
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,6 @@ class Hub(LoopMixin):
     app = None
 
     def __init__(self):
-        self._outgoing = deque()
         self.Waiter = partial(Waiter, self)
         self.Greenlet = partial(Greenlet, self)
 
@@ -161,6 +161,11 @@ class Hub(LoopMixin):
     def _stopped(self):
         """Set when loop stopped."""
         return self.app.env.RealEvent()
+
+    @cached_property
+    def _async_queue(self):
+        """Create async queue here."""
+        return AsyncQueue(self.loop, lambda callback: callback())
 
     @cached_property
     def _greenlet(self):
@@ -180,30 +185,13 @@ class Hub(LoopMixin):
         except HandleError:
             pass  # pragma: no cover
 
-    @cached_property
-    def _callback_handle(self):
-        """Handle that should run functions in loop thread."""
-        return Prepare(self.loop)
-
-    def _before_iteration(self, handle):
-        """Should be used to run functions in loop's thread."""
-        outgoing = self._outgoing
-        while True:
-            try:
-                callback = outgoing.popleft()
-            except IndexError:
-                break
-            else:
-                callback()
-
     def callback(self, fn, *args, **kwargs):
         """Enqueue function execution to loop. Return :class:`Callback`
         instance.
 
         """
         cb = Callback(fn, *args, **kwargs)
-        self._outgoing.append(cb)
-        self.wakeup()
+        self._async_queue.send(cb)
         return cb
 
     def handle_error(self, exc_type, value, traceback):
@@ -213,10 +201,12 @@ class Hub(LoopMixin):
     def _setup_loop(self, loop):
         loop.ident = self.app.env.get_real_ident()
         loop.excepthook = self.handle_error
-        self._callback_handle.start(self._before_iteration)
 
     def _teardown_loop(self, loop):
         loop.excepthook = None
+        self._async_queue.close()
+        del self._greenlet
+        del self._guard
 
     def _run(self):
         """Run event loop."""
@@ -233,9 +223,6 @@ class Hub(LoopMixin):
             logger.debug('Loop %s stopped...', hex(id(loop)))
             stopped.set()
             self._teardown_loop(loop)
-            del self._greenlet
-            del self._guard
-            del self._callback_handle
 
     @in_loop
     def _close_handlers(self):
