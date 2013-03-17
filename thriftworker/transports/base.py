@@ -137,6 +137,8 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                              ' service %r: %s', service, strerror(error))
                 return
             if concurrency.reached:
+                logger.error('Can\'t handle new connection,'
+                             ' concurrency limit reached')
                 return
             with ignore_eagain():
                 sock, addr = listen_sock.accept()

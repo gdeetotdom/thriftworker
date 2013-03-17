@@ -114,3 +114,4 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                 acceptors.stop_accepting()
 
         return inner_producer
+

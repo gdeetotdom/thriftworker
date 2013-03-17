@@ -6,6 +6,7 @@ import logging
 from collections import deque
 from functools import partial
 
+import pyuv
 from six import PY3
 from greenlet import greenlet, getcurrent, GreenletExit
 from pyuv import Async, Timer
@@ -26,6 +27,18 @@ def _kill(greenlet, exception, waiter):
     except Exception as exc:
         logger.exception(exc)
     waiter.switch()
+
+
+def _patch_loop(loop):
+    if hasattr(loop, "queue_work") or not loop:
+        # we only patch the loop for 0.8
+        return loop
+
+    tloop = pyuv.ThreadPool(loop)
+
+    loop._tloop = tloop
+    loop.queue_work = loop._tloop.queue_work
+    return loop
 
 
 if PY3:
@@ -201,6 +214,7 @@ class Hub(LoopMixin):
     def _setup_loop(self, loop):
         loop.ident = self.app.env.get_real_ident()
         loop.excepthook = self.handle_error
+        return _patch_loop(loop)
 
     def _teardown_loop(self, loop):
         loop.excepthook = None
@@ -214,7 +228,7 @@ class Hub(LoopMixin):
         started = self._started
         stopped = self._stopped
         greenlet = self._greenlet
-        self._setup_loop(loop)
+        loop = self._setup_loop(loop)
         logger.debug('Loop %s started...', hex(id(loop)))
         started.set()
         try:
