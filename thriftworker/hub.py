@@ -209,7 +209,8 @@ class Hub(LoopMixin):
 
     def handle_error(self, exc_type, value, traceback):
         """Log in-loop errors with our logger."""
-        logger.error(value, exc_info=(exc_type, value, traceback))
+        if logger is not None:
+            logger.error(value, exc_info=(exc_type, value, traceback))
 
     def _setup_loop(self, loop):
         loop.ident = self.app.env.get_real_ident()
