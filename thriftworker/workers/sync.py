@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import sys
 import logging
 
-from thriftworker.utils.decorators import cached_property
 from thriftworker.workers.base import BaseWorker
 
 logger = logging.getLogger(__name__)

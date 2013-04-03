@@ -1,15 +1,13 @@
+import socket
 from io import BytesIO
 from logging import getLogger
 from struct import Struct
-from sys import maxint
 
 cimport cython
-from six import next
-from cStringIO import StringIO
 from pyuv.errno import strerror, UV_EOF
 
 from thriftworker.utils.stats import Counter
-from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
+from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE
 
 logger = getLogger(__name__)
 
@@ -26,6 +24,13 @@ cdef enum ReadState:
 cdef enum ConnectionState:
     CONNECTION_READY = 0
     CONNECTION_CLOSED = 1
+
+
+def getpeername(sock):
+    try:
+        return sock.getpeername()
+    except socket.error:
+        return ('unknown', 0)
 
 
 cdef class InputPacket:
@@ -164,8 +169,8 @@ cdef class Connection:
         try:
             self.close_callback(self)
         finally:
-            # Remove references to objects.
-            self.close_callback = self.handle = self.socket = None
+            # Remove references to callback.
+            self.close_callback = None
 
     cpdef ready(self, object all_ok, object data, int packet_id):
         assert self.state == CONNECTION_READY, 'connection not ready'
@@ -184,9 +189,7 @@ cdef class Connection:
             self.handle.write(data, self.cb_write_done)
 
     cdef inline void handle_error(self, object error):
-        peer = self.socket.getpeername()
-        logger.warn('Error from %s: %s',
-            "{0[0]}:{0[1]}".format(peer), strerror(error))
+        logger.warn('Error with %r: %s', self, strerror(error))
 
     cpdef cb_read_done(self, object handle, object data, object error):
         if error:
@@ -220,5 +223,5 @@ cdef class Connection:
             self.close()
 
     def __repr__(self):
-        peer = self.socket.getpeername()
+        peer = getpeername(self.socket)
         return ('<{0} from {1[0]}:{1[1]}>'.format(type(self).__name__, peer))

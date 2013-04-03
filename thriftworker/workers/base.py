@@ -32,7 +32,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         pool_size = self.pool_size
         concurrency = self.concurrency
         acceptors = self.app.acceptors
-        counters = self.app.counters
+        counter = self.app.counters['response_served']
+        timeouts = self.app.timeouts
         timers = self.app.timers
         loop = self.app.loop
 
@@ -40,19 +41,22 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
             """Process task result."""
             if exception is None:
                 success, (method, response) = True, result
-                key = (request.service, method)
-                counters[key] += 1
+                key = "{0}::{1}".format(request.service, method)
                 took = loop.now() - request.start_time
                 timers[key] += took
             else:
                 logger.error(exception[1], exc_info=exception)
                 success, response = False, ''
+
             if connection.is_ready():
+                counter.add()
                 connection.ready(success, response, request_id)
             elif exception is None and response:
+                timeouts[key] += took
                 logger.warn(
                     "Method %s::%s took %d ms, it's too late for %r",
                         request.service, method, int(took), connection)
+
             if concurrency.reached and pool_size > concurrency:
                 concurrency.reached.clean()
                 logger.debug('Start registered acceptors,'
@@ -88,7 +92,7 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         pool_size = self.pool_size
         create_callback = self.create_callback
         processor = self.app.services.create_processor(service)
-        counter = self.app.counters[('Internal', 'pool_overflow')]
+        counter = self.app.counters['pool_overflow']
         task = self.create_task(processor)
         consume = self.create_consumer()
         acceptors = self.app.acceptors
@@ -112,4 +116,3 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                 acceptors.stop_accepting()
 
         return inner_producer
-
