@@ -1,3 +1,4 @@
+from io import BytesIO
 from logging import getLogger
 from struct import Struct
 from sys import maxint
@@ -13,170 +14,179 @@ from thriftworker.constants import LENGTH_FORMAT, LENGTH_SIZE, NONBLOCKING
 logger = getLogger(__name__)
 
 
+cdef object length_struct = Struct(LENGTH_FORMAT)
+
+
+cdef enum ReadState:
+    READ_LEN = 0
+    READ_PAYLOAD = 1
+    READ_DONE = 2
+
+
+cdef enum ConnectionState:
+    CONNECTION_READY = 0
+    CONNECTION_CLOSED = 1
+
+
+cdef class InputPacket:
+    """Represent some framed packet that we can read."""
+
+    # Number of input packet.
+    cdef int packet_id
+
+    # Length of message.
+    cdef int length
+
+    # Number of received bytes.
+    cdef int received
+
+    # Current state of packet.
+    cdef ReadState state
+
+    # Buffer for packet payload.
+    cdef object payload
+
+    def __init__(self, packet_id):
+        self.packet_id = packet_id
+        self.length = 0
+        self.state = READ_LEN
+        self.payload = BytesIO()
+
+    cdef inline bint is_ready(self):
+        """Returns ``True`` if packet is received."""
+        return self.state == READ_DONE
+
+    cdef inline int read_length(self, object incoming):
+        """Get length from message and return relative position."""
+        assert self.state == READ_LEN, 'too late for length'
+        assert len(incoming) >= LENGTH_SIZE, "packet length can't be read"
+
+        self.length = length_struct.unpack_from(incoming[0:LENGTH_SIZE].tobytes())[0]
+        assert self.length > 0, "negative or empty frame size, it seems" \
+                                " client doesn't use FramedTransport"
+
+        self.state = READ_PAYLOAD
+        return LENGTH_SIZE
+
+    cdef inline int read_payload(self, object incoming):
+        """Reads data from stream and switch state."""
+        assert self.state == READ_PAYLOAD, 'too early or too late for payload'
+
+        incoming_length = len(incoming)
+        self.received += incoming_length
+        self.payload.write(incoming[:self.length])
+
+        if self.received >= self.length:
+            self.state = READ_DONE
+            return self.length
+        else:
+            return incoming_length
+
+    cdef object push(self, object incoming):
+        """Process incoming bytes."""
+        cdef int position = 0
+        cdef object view = memoryview(incoming)
+        while view:
+            if self.state == READ_LEN:
+                position = self.read_length(view)
+            elif self.state == READ_PAYLOAD:
+                position = self.read_payload(view)
+            else:
+                return view[position:].tobytes()
+            view = view[position:]
+        return ''
+
+    cdef inline object get_buffer(self):
+        """Return packet value."""
+        assert self.state == READ_DONE, 'packet not received'
+        return self.payload
+
+
 cdef class Connection:
-    """Basic class is represented connection.
+    """Connection that work with framed packets."""
 
-    It can be in state:
-        WAIT_LEN --- connection is reading request length.
-        WAIT_MESSAGE --- connection is reading request.
-        WAIT_PROCESS --- connection has just read whole request and
-            waits for call ready routine.
-        SEND_ANSWER --- connection is sending answer string (including length
-            of answer).
-        CLOSED --- socket was closed and connection should be deleted.
+    # Store id of next packet.
+    cdef int next_packet_id
 
-    """
+    # Store id of current packet.
+    cdef int current_packet_id
 
-    def __init__(self, object producer, object loop, object client,
-                 object sock, object on_close):
-        # Default values.
-        self.left_buffer = None
-        self.recv_bytes = self.message_length = 0
-        self.status = WAIT_LEN
-        self.struct = Struct(LENGTH_FORMAT)
-        self.message_buffer = StringIO()
-        self.incoming_buffer = None
+    # Store current packet here.
+    cdef InputPacket current_packet
 
-        # Create request id generator.
-        self.request_id = 0
-        self.request_counter = Counter()
+    # Current state of connection.
+    cdef ConnectionState state
+
+    cdef object producer
+    cdef object handle
+    cdef object socket
+    cdef object close_callback
+
+    def __init__(self, object producer, object loop, object handle, object socket, object close_callback):
+        # Default variables.
+        self.next_packet_id = 0
+        self.current_packet_id = 0
+        self.current_packet = self.create_packet()
+        self.state = CONNECTION_READY
 
         # Given arguments.
         self.producer = producer
-        self.loop = loop
-        self.client = client
-        self.sock = sock
-        self.peer = sock.getpeername()
-        self.on_close = on_close
+        self.handle = handle
+        self.socket = socket
+        self.close_callback = close_callback
 
         # Start watchers.
-        self.client.start_read(self.cb_read_done)
+        self.handle.start_read(self.cb_read_done)
 
-    @cython.profile(False)
-    cdef inline object next_request_id(self):
-        self.request_counter.add()
-        request_id = self.request_id = self.request_counter.count
-        return request_id
+    cdef inline InputPacket create_packet(self):
+        """Create new packet for processing."""
+        self.next_packet_id += 1
+        return InputPacket(self.next_packet_id)
 
-    @cython.profile(False)
-    cdef inline bint is_writeable(self):
-        """Returns ``True`` if source is writable."""
-        return self.status == SEND_ANSWER
+    cpdef object is_ready(self):
+        """Returns ``True`` if connection is ready."""
+        return self.state == CONNECTION_READY
 
-    @cython.profile(False)
-    cdef inline bint is_readable(self):
-        """Returns ``True`` if source is readable."""
-        return self.status == WAIT_LEN or self.status == WAIT_MESSAGE
+    cpdef object is_closed(self):
+        """Returns ``True`` if connection is closed."""
+        return self.state == CONNECTION_CLOSED
 
-    @cython.profile(False)
-    cdef inline bint is_ready(self):
-        """Returns ``True`` if source is ready."""
-        return self.status == WAIT_PROCESS
-
-    @cython.profile(False)
-    cpdef is_waiting(self):
-        """Returns ``True`` if source is waiting for answer."""
-        return self.status == WAIT_ANSWER
-
-    @cython.profile(False)
-    cpdef is_closed(self):
-        """Returns ``True`` if source is closed."""
-        return self.status == CLOSED
-
-    cdef inline read(self):
-        """Reads data from stream and switch state."""
-        assert self.is_readable(), 'socket in non-readable state'
-        incoming_buffer = self.incoming_buffer
-        received = len(incoming_buffer)
-        self.incoming_buffer = ''
-
-        if received == 0:
-            # if we read 0 bytes and message is empty, it means client
-            # close connection
-            self.close()
-            return
-
-        if self.status == WAIT_LEN:
-            assert received >= LENGTH_SIZE, "message length can't be read"
-
-            view = buffer(incoming_buffer)
-            message_length = self.struct.unpack_from(view[0:LENGTH_SIZE])[0]
-            assert message_length > 0, "negative or empty frame size, it seems" \
-                                       " client doesn't use FramedTransport"
-
-            self.message_buffer.write(view[LENGTH_SIZE:message_length + LENGTH_SIZE])
-            self.message_length = message_length
-            self.status = WAIT_MESSAGE
-
-            received = received - LENGTH_SIZE
-
-        elif self.status == WAIT_MESSAGE:
-            # Simply write data to buffer.
-            left = self.message_length - self.recv_bytes
-            self.message_buffer.write(incoming_buffer[:left])
-
-        self.recv_bytes += received
-        recv_bytes = self.recv_bytes
-
-        # We receive whole message.
-        if recv_bytes >= self.message_length:
-            self.recv_bytes = 0
-            self.status = WAIT_PROCESS
-
-        # Two requested come together.
-        if recv_bytes > self.message_length:
-            since = self.message_length - recv_bytes
-            self.left_buffer = incoming_buffer[since:]
-
-    cpdef close(self):
+    cpdef object close(self):
         """Closes connection."""
-        assert not self.is_closed(), 'socket already closed'
+        assert not self.is_closed(), 'connection already closed'
 
         # Close socket.
-        self.status = CLOSED
-        self.client.close()
-        self.sock.close()
+        self.state = CONNECTION_CLOSED
+        self.handle.close()
+        self.socket.close()
 
         # Execute callback.
-        self.on_close(self)
+        try:
+            self.close_callback(self)
+        finally:
+            # Remove references to objects.
+            self.close_callback = self.handle = self.socket = None
 
-        # Remove references to objects.
-        self.on_close = self.client = self.message_buffer = \
-            self.incoming_buffer = None
+    cpdef ready(self, object all_ok, object data, int packet_id):
+        assert self.state == CONNECTION_READY, 'connection not ready'
 
-    cpdef ready(self, object all_ok, object message, object request_id):
-        """The ready can switch Connection to three states:
-
-            WAIT_LEN if request was oneway.
-            SEND_ANSWER if request was processed in normal way.
-            CLOSED if request throws unexpected exception.
-
-        """
-        assert self.is_waiting(), 'socket is not waiting for answer'
-
-        if self.request_id != request_id:
+        if self.current_packet_id != packet_id:
             return
 
         if not all_ok:
             self.close()
             return
 
-        message_length = self.message_length = len(message)
-
-        if message_length == 0:
-            # it was a one way request, do not write answer
-            self.status = WAIT_LEN
-        else:
-            # Create message.
-            data = self.struct.pack(message_length)
-            data += message
-            self.status = SEND_ANSWER
-            # Write data.
-            self.client.write(data, self.cb_write_done)
+        cdef int data_length = len(data)
+        if data_length != 0:
+            # Prepend length to message
+            data = length_struct.pack(data_length) + data
+            self.handle.write(data, self.cb_write_done)
 
     cdef inline void handle_error(self, object error):
-        logger.warn('Error from %s: %s', "{0[0]}:{0[1]}".format(self.peer),
-                    strerror(error))
+        peer = self.socket.getpeername()
+        logger.warn('Error from %s: %s',
+            "{0[0]}:{0[1]}".format(peer), strerror(error))
 
     cpdef cb_read_done(self, object handle, object data, object error):
         if error:
@@ -185,49 +195,30 @@ cdef class Connection:
             self.close()
             return
 
+        if not data:
+            # if message is empty, it means that client close connection
+            self.close()
+            return
+
+        cdef int packet_id = 0
+        cdef InputPacket packet = self.current_packet
         try:
-            self.incoming_buffer = data or ''
-            if self.is_readable():
-                # Try to read whole message to buffer while we can.
-                self.read()
-
-            if not self.is_ready():
-                # We aren't ready to transfer message to sink.
-                return
-            elif not self.is_waiting():
-                # Grow up request id.
-                request_id = self.next_request_id()
-                # Change state to needed if some data left in buffer.
-                self.status = WAIT_ANSWER if not self.left_buffer else WAIT_LEN
-                # Send message to workers.
-                self.producer(self, self.message_buffer, request_id)
-                # Reset message buffer.
-                self.message_buffer = StringIO()
-            else:
-                # Socket was closed while we wait for answer.
-                self.close()
-
-            if self.left_buffer:
-                # If something left in buffer that's because of one way
-                # request. We may to ignore answer to previous request.
-                left_buffer = self.left_buffer
-                self.left_buffer = None
-                self.cb_read_done(handle, left_buffer, error)
+            while data:
+                data = packet.push(data)
+                if packet.is_ready():
+                    packet_id = self.current_packet_id = packet.packet_id
+                    self.producer(self, packet.get_buffer(), packet_id)
+                    packet = self.current_packet = self.create_packet()
 
         except Exception as exc:
             logger.exception(exc)
             self.close()
 
     cpdef cb_write_done(self, object handle, object error):
-        assert self.is_writeable(), 'socket in non writable state'
-
         if error:
             self.handle_error(error)
             self.close()
-            return
-
-        self.status = WAIT_LEN
 
     def __repr__(self):
-        return ('<{0} from {2[0]}:{2[1]} at {1}>'.
-                format(self.__class__.__name__, hex(id(self)), self.peer))
+        peer = self.socket.getpeername()
+        return ('<{0} from {1[0]}:{1[1]}>'.format(type(self).__name__, peer))
