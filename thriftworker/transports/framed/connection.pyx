@@ -61,7 +61,7 @@ cdef class InputPacket:
         """Returns ``True`` if packet is received."""
         return self.state == READ_DONE
 
-    cdef inline int read_length(self, object incoming):
+    cdef inline object read_length(self, object incoming):
         """Get length from message and return relative position."""
         assert self.state == READ_LEN, 'too late for length'
         assert len(incoming) >= LENGTH_SIZE, "packet length can't be read"
@@ -73,7 +73,7 @@ cdef class InputPacket:
         self.state = READ_PAYLOAD
         return LENGTH_SIZE
 
-    cdef inline int read_payload(self, object incoming):
+    cdef inline object read_payload(self, object incoming):
         """Reads data from stream and switch state."""
         assert self.state == READ_PAYLOAD, 'too early or too late for payload'
 
@@ -99,6 +99,7 @@ cdef class InputPacket:
             else:
                 return view[position:].tobytes()
             view = view[position:]
+            position = 0
         return ''
 
     cdef inline object get_buffer(self):
