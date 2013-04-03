@@ -137,15 +137,16 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                              ' service %r: %s', service, strerror(error))
                 return
             if concurrency.reached:
+                logger.error('Can\'t handle new connection,'
+                             ' concurrency limit reached')
                 return
             with ignore_eagain():
                 sock, addr = listen_sock.accept()
                 # Disable Nagle's algorithm for socket.
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                client = Handle(loop)
-                client.open(sock.fileno())
-                connection = self.Connection(producer, loop, client, sock,
-                                             on_close)
+                handle = Handle(loop)
+                handle.open(sock.fileno())
+                connection = self.Connection(producer, loop, handle, sock, on_close)
                 connections.register(connection)
 
         return inner_acceptor

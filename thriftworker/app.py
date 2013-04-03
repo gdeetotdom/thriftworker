@@ -35,6 +35,7 @@ class ThriftWorker(SubclassMixin):
     def __init__(self, loop=None, protocol_factory=None, port_range=None,
                  pool_size=None, shutdown_timeout=None):
         self.counters = Counters()
+        self.timeouts = Counters()
         self.timers = Timers()
         # Set provided instance if we can.
         if loop is not None:

@@ -120,7 +120,7 @@ class TestFramedAcceptor(AcceptorMixin, TestCase):
     def test_several_one_way(self):
         payload = b'xxxx'
         process = self.processor.process = Mock(return_value=None)
-        factor = 2
+        factor = 5
 
         source = socket.socket()
         acceptor = self.Acceptor(name=self.service_name,
