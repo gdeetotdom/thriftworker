@@ -19,5 +19,5 @@ class Timers(defaultdict):
                       'squared_sum': timer.squared_sum,
                       'min': timer.min,
                       'max': timer.max,
-                      'distribution': timer.query(0.95)}
+                      'distribution95': timer.query(0.95)}
                 for key, timer in self.items()}
