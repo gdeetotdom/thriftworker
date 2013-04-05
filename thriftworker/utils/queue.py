@@ -32,8 +32,11 @@ class AsyncQueue(object):
         self.loop = loop
         self._queue = deque()
         self._dispatcher = pyuv.Prepare(self.loop)
-        self._spinner = pyuv.Idle(self.loop)
+        self._dispatcher.start(self._send)
+        if hasattr(self._dispatcher, 'unref'):
+            self._dispatcher.unref()
         self._tick = pyuv.Async(loop, self._do_send)
+        self._spinner = pyuv.Idle(self.loop)
         self._callback = callback
 
     def send(self, msg):
@@ -57,17 +60,17 @@ class AsyncQueue(object):
             self._tick.close()
 
     def _do_send(self, handle):
-        if not self._dispatcher.active:
-            self._dispatcher.start(self._send)
-            self._spinner.start(lambda h: h.stop())
+        self._spinner.start(lambda h: None)
 
     def _send(self, handle):
-        queue, self._queue = self._queue, deque()
-        for msg in queue:
+        queue = self._queue
+        length = len(queue)
+
+        for _ in xrange(length):
             try:
-                self._callback(msg)
+                self._callback(queue.popleft())
             except Exception as exc:
                 logger.exception(exc)
 
-        if not self._dispatcher.closed:
-            self._dispatcher.stop()
+        if not self._spinner.closed:
+            self._spinner.stop()
