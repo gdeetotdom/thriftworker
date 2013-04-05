@@ -15,29 +15,22 @@ class AsyncQueue(object):
     It allows you to queue messages that will be handled later by the
     application::
 
-        # callback for the queue
-        def cb(msg):
-            # ... do something with the message
-            print(msg)
-
         # define the queue
-        q = AsyncQueue(loop, cb)
+        q = AsyncQueue(loop)
 
         # ... send a message
-        q.send("some message")
+        q.send(callable)
 
     """
 
-    def __init__(self, loop, callback):
+    def __init__(self, loop):
         self.loop = loop
         self._queue = deque()
         self._dispatcher = pyuv.Prepare(self.loop)
         self._dispatcher.start(self._send)
         if hasattr(self._dispatcher, 'unref'):
             self._dispatcher.unref()
-        self._tick = pyuv.Async(loop, self._do_send)
-        self._spinner = pyuv.Idle(self.loop)
-        self._callback = callback
+        self._tick = pyuv.Async(loop, lambda h: None)
 
     def send(self, msg):
         """ add a message to the queue
@@ -54,23 +47,15 @@ class AsyncQueue(object):
         self._queue.clear()
         if not self._dispatcher.closed:
             self._dispatcher.close()
-        if not self._spinner.closed:
-            self._spinner.close()
         if not self._tick.closed:
             self._tick.close()
 
-    def _do_send(self, handle):
-        self._spinner.start(lambda h: None)
-
     def _send(self, handle):
         queue = self._queue
-        length = len(queue)
-
-        for _ in xrange(length):
+        while True:
             try:
-                self._callback(queue.popleft())
-            except Exception as exc:
-                logger.exception(exc)
-
-        if not self._spinner.closed:
-            self._spinner.stop()
+                callback = queue.popleft()
+            except IndexError:
+                break
+            else:
+                callback()
