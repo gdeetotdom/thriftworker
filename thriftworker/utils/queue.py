@@ -7,6 +7,7 @@ from collections import deque
 import pyuv
 
 logger = logging.getLogger(__name__)
+noop = lambda h: None
 
 
 class AsyncQueue(object):
@@ -30,7 +31,8 @@ class AsyncQueue(object):
         self._dispatcher.start(self._send)
         if hasattr(self._dispatcher, 'unref'):
             self._dispatcher.unref()
-        self._tick = pyuv.Async(loop, lambda h: None)
+        self._tick = pyuv.Async(loop, self._spin_up)
+        self._spinner = pyuv.Idle(self.loop)
 
     def send(self, msg):
         """ add a message to the queue
@@ -47,8 +49,13 @@ class AsyncQueue(object):
         self._queue.clear()
         if not self._dispatcher.closed:
             self._dispatcher.close()
+        if not self._spinner.closed:
+            self._spinner.close()
         if not self._tick.closed:
             self._tick.close()
+
+    def _spin_up(self, handle):
+        self._spinner.start(noop)
 
     def _send(self, handle):
         queue = self._queue
@@ -59,3 +66,5 @@ class AsyncQueue(object):
                 break
             else:
                 callback()
+        if self._spinner.active:
+            self._spinner.stop()

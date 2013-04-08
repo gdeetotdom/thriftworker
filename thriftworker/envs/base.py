@@ -4,6 +4,8 @@ from abc import ABCMeta, abstractproperty, abstractmethod
 
 from six import with_metaclass
 
+from . import queue, event
+
 
 class BaseEnv(with_metaclass(ABCMeta)):
     """Provided methods and property that should be used to work properly with
@@ -24,10 +26,6 @@ class BaseEnv(with_metaclass(ABCMeta)):
         raise NotImplementedError()
 
     @abstractproperty
-    def RealEvent(self):
-        raise NotImplementedError()
-
-    @abstractproperty
     def socket(self):
         raise NotImplementedError()
 
@@ -42,3 +40,12 @@ class BaseEnv(with_metaclass(ABCMeta)):
     @abstractmethod
     def start_thread(self, func, args=None, kwargs=None):
         raise NotImplementedError()
+
+    @property
+    def queue(self):
+        """Return queue module here."""
+        return queue
+
+    @property
+    def RealEvent(self):
+        return event.Event

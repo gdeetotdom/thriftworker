@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 import logging
-from collections import namedtuple
 from abc import ABCMeta, abstractmethod
 from functools import partial
 
@@ -14,31 +13,51 @@ from thriftworker.utils.decorators import cached_property
 logger = logging.getLogger(__name__)
 
 
+class Request(object):
+
+    __slots__ = ('connection', 'message_buffer', 'request_id', 'service',
+                 'start_time')
+
+    def __init__(self, connection, message_buffer, request_id, service,
+                 start_time):
+        self.connection = connection
+        self.message_buffer = message_buffer
+        self.request_id = request_id
+        self.service = service
+        self.start_time = start_time
+
+
 class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
 
-    #: Store request in this tuple.
-    Request = namedtuple('Request', ('connection', 'message_buffer',
-                                     'request_id', 'service',
-                                     'start_time'))
+    Request = Request
 
     def __init__(self, pool_size=None):
         self.pool_size = pool_size or 10
         super(BaseWorker, self).__init__()
 
-    def create_callback(self, request):
+    def create_callback(self):
         """Create callback that should be called after request was done."""
-        connection = request.connection
-        request_id = request.request_id
-        pool_size = self.pool_size
         concurrency = self.concurrency
         acceptors = self.app.acceptors
         counter = self.app.counters['response_served']
         timeouts = self.app.timeouts
         timers = self.app.timers
         loop = self.app.loop
+        delay = self.app.hub.callback
 
-        def inner_callback(result, exception=None):
+        def start_accepting():
+            if not concurrency.reached:
+                return
+            concurrency.reached.clean()
+            logger.debug('Start registered acceptors,'
+                         ' current concurrency: %d...', int(concurrency))
+            acceptors.start_accepting()
+
+        def inner_callback(request, result, exception=None):
             """Process task result."""
+            connection = request.connection
+            request_id = request.request_id 
+
             if exception is None:
                 success, (method, response) = True, result
                 key = "{0}::{1}".format(request.service, method)
@@ -57,11 +76,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                     "Method %s::%s took %d ms, it's too late for %r",
                         request.service, method, int(took), connection)
 
-            if concurrency.reached and pool_size > concurrency:
-                concurrency.reached.clean()
-                logger.debug('Start registered acceptors,'
-                             ' current concurrency: %d...', int(concurrency))
-                acceptors.start_accepting()
+            if concurrency.reached:
+                delay(start_accepting)
 
         return inner_callback
 
@@ -87,16 +103,26 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
 
     def create_producer(self, service):
         """Create producer for connections."""
-        Request = self.Request
         concurrency = self.concurrency
         pool_size = self.pool_size
-        create_callback = self.create_callback
+        callback = self.create_callback()
         processor = self.app.services.create_processor(service)
         counter = self.app.counters['pool_overflow']
         task = self.create_task(processor)
         consume = self.create_consumer()
         acceptors = self.app.acceptors
         loop = self.app.loop
+        delay = self.app.hub.callback
+        Request = self.Request
+
+        def stop_accepting():
+            if concurrency.reached or pool_size > concurrency:
+                return
+            logger.debug('Stop registered acceptors,'
+                         ' current concurrency: %d...', int(concurrency))
+            counter.add()
+            concurrency.reached.set()
+            acceptors.stop_accepting()
 
         def inner_producer(connection, message_buffer, request_id):
             """Enqueue given request to thread pool."""
@@ -106,13 +132,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                               service=service,
                               start_time=loop.now())
             curried_task = partial(task, request)
-            callback = create_callback(request)
-            consume(curried_task, callback)
+            consume(curried_task, partial(callback, request))
             if not concurrency.reached and pool_size <= concurrency:
-                logger.debug('Stop registered acceptors,'
-                             ' current concurrency: %d...', int(concurrency))
-                counter.add()
-                concurrency.reached.set()
-                acceptors.stop_accepting()
+                delay(stop_accepting)
 
         return inner_producer
