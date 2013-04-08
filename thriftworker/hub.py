@@ -178,7 +178,7 @@ class Hub(LoopMixin):
     @cached_property
     def _async_queue(self):
         """Create async queue here."""
-        return AsyncQueue(self.loop, lambda callback: callback())
+        return AsyncQueue(self.loop)
 
     @cached_property
     def _greenlet(self):

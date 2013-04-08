@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import socket
 
 from thread import start_new_thread, get_ident
-from threading import Event, RLock
+from threading import RLock, Event
 
 from .base import BaseEnv
 
@@ -18,7 +18,6 @@ class SyncEnv(BaseEnv):
     @property
     def Event(self):
         return Event
-    RealEvent = Event
 
     @property
     def RLock(self):

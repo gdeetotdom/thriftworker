@@ -47,8 +47,8 @@ class TestBaseWorker(WorkerMixin, TestCase):
         with start_stop_ctx(self.create_worker()) as worker:
             request = self.Worker.Request(connection, data, request_id,
                                           self.service_name, 0)
-            callback = worker.create_callback(request)
-            callback(result)
+            callback = worker.create_callback()
+            callback(request, result)
             self.assertEqual(1, connection.ready.call_count)
             args, kwargs = connection.ready.call_args
             self.assertTrue(args[0])

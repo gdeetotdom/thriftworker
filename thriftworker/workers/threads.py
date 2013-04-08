@@ -2,8 +2,8 @@ from __future__ import absolute_import
 
 import sys
 import logging
-from threading import Thread, Event
-from Queue import Queue, Empty
+from collections import namedtuple
+from threading import Thread
 
 from thriftworker.utils.decorators import cached_property
 from thriftworker.workers.base import BaseWorker
@@ -14,12 +14,13 @@ logger = logging.getLogger(__name__)
 class Worker(Thread):
     """Simple threaded worker."""
 
-    def __init__(self, tasks, shutdown_timeout=None):
+    def __init__(self, app, queue, shutdown_timeout=None):
         super(Worker, self).__init__()
+        self.app = app
         self.daemon = True
-        self.tasks = tasks
-        self._is_shutdown = Event()
-        self._is_stopped = Event()
+        self.queue = queue
+        self._is_shutdown = self.app.env.Event()
+        self._is_stopped = self.app.env.Event()
         self.shutdown_timeout = shutdown_timeout or 5.0
 
     def body(self):
@@ -27,23 +28,22 @@ class Worker(Thread):
         sent.
 
         """
-        tasks = self.tasks
+        get = self.queue.get
         shutdown = self._is_shutdown.set
+        delay = self.app.hub.callback
+
         while True:
-            try:
-                message = tasks.get()
-            except Empty:
-                break
+            message = get()
             if message is None:
                 shutdown()
                 break
-            result, exception = None, None
-            task, callback = message
+            result = None
+            exception = None
             try:
-                result = task()
+                result = message.task()
             except Exception:
                 exception = sys.exc_info()
-            callback(result, exception)
+            delay(message.callback, result, exception)
 
     def run(self):
         shutdown_set = self._is_shutdown.is_set
@@ -63,16 +63,17 @@ class Pool(object):
 
     Worker = Worker
 
-    def __init__(self, size=None):
+    def __init__(self, app, size=None):
+        self.app = app
         self.size = size or 1
-        self._tasks = Queue()
+        self.queue = self.app.env.queue.Queue()
 
     @cached_property
     def _workers(self):
-        return [self.Worker(self._tasks) for i in xrange(self.size)]
+        return [self.Worker(self.app, self.queue) for i in xrange(self.size)]
 
     def put(self, task):
-        self._tasks.put_nowait(task)
+        self.queue.put_nowait(task)
 
     def start(self):
         for worker in self._workers:
@@ -80,7 +81,7 @@ class Pool(object):
 
     def stop(self):
         for _ in self._workers:
-            self._tasks.put(None)
+            self.queue.put(None)
         for worker in self._workers:
             worker.wait()
 
@@ -88,16 +89,17 @@ class Pool(object):
 class ThreadsWorker(BaseWorker):
     """Process all request in thread-pool."""
 
+    Message = namedtuple('Message', ('task', 'callback'))
+
     @cached_property
     def _pool(self):
-        return Pool(self.app.pool_size)
+        return Pool(self.app, size=self.app.pool_size)
 
     def create_consumer(self):
         pool = self._pool
-        execute = self.app.hub.callback
 
         def inner_consumer(task, callback):
-            pool.put((task, lambda *args: execute(callback, *args)))
+            pool.put(self.Message(task, callback))
 
         return inner_consumer
 

@@ -1,4 +1,3 @@
-import socket
 from io import BytesIO
 from logging import getLogger
 from struct import Struct
@@ -24,13 +23,6 @@ cdef enum ReadState:
 cdef enum ConnectionState:
     CONNECTION_READY = 0
     CONNECTION_CLOSED = 1
-
-
-def getpeername(sock):
-    try:
-        return sock.getpeername()
-    except socket.error:
-        return ('unknown', 0)
 
 
 cdef class InputPacket:
@@ -123,12 +115,14 @@ cdef class Connection:
     # Current state of connection.
     cdef ConnectionState state
 
+    # Remote peer name.
+    cdef object peer
+
     cdef object producer
     cdef object handle
-    cdef object socket
     cdef object close_callback
 
-    def __init__(self, object producer, object loop, object handle, object socket, object close_callback):
+    def __init__(self, object producer, object loop, object handle, object peer, object close_callback):
         # Default variables.
         self.next_packet_id = 0
         self.current_packet_id = 0
@@ -138,7 +132,7 @@ cdef class Connection:
         # Given arguments.
         self.producer = producer
         self.handle = handle
-        self.socket = socket
+        self.peer = peer
         self.close_callback = close_callback
 
         # Start watchers.
@@ -164,7 +158,6 @@ cdef class Connection:
         # Close socket.
         self.state = CONNECTION_CLOSED
         self.handle.close()
-        self.socket.close()
 
         # Execute callback.
         try:
@@ -224,5 +217,4 @@ cdef class Connection:
             self.close()
 
     def __repr__(self):
-        peer = getpeername(self.socket)
-        return ('<{0} from {1[0]}:{1[1]}>'.format(type(self).__name__, peer))
+        return ('<{0} from {1[0]}:{1[1]}>'.format(type(self).__name__, self.peer))

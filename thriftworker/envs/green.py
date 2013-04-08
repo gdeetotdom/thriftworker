@@ -8,7 +8,6 @@ from thriftworker.utils.imports import get_real_module
 from thriftworker.utils.decorators import cached_property
 
 from .base import BaseEnv
-from ._event import Event as RealEvent
 
 
 class GeventEnv(BaseEnv):
@@ -36,11 +35,6 @@ class GeventEnv(BaseEnv):
     @property
     def Event(self):
         return Event
-
-    @property
-    def RealEvent(self):
-        """Event that ignore monkey patching."""
-        return RealEvent
 
     @property
     def RLock(self):
