@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import os
 import socket
 import errno
 import logging
@@ -17,9 +18,13 @@ from thriftworker.utils.loop import in_loop
 from thriftworker.utils.decorators import cached_property
 from thriftworker.utils.waiting import wait
 
+from . import helpers
+
 logger = logging.getLogger(__name__)
 
 Handle = TCP if hasattr(TCP, 'open') else Pipe
+
+NOTBLOCK = (errno.EAGAIN, errno.EWOULDBLOCK, errno.EINVAL, errno.EBADF)
 
 
 @contextmanager
@@ -27,7 +32,7 @@ def ignore_eagain():
     """Ignore all *EAGAIN* errors in context."""
     try:
         yield
-    except socket.error as exc:
+    except OSError as exc:
         if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK,
                              errno.EINVAL, errno.EBADF):
             raise
@@ -88,8 +93,7 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
     def _socket(self):
         """Create socket from given descriptor."""
         socket = self.app.env.socket
-        sock = socket.fromfd(self.descriptor, socket.AF_INET,
-                             socket.SOCK_STREAM)
+        sock = socket.fromfd(self.descriptor, socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(0)
         return sock
 
@@ -121,10 +125,9 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
         loop = self.loop
         service = self.name
         connections = self._connections
-        listen_sock = self._socket
+        listen_fd = self._socket.fileno()
         worker = self.app.worker
         producer = worker.create_producer(service)
-        concurrency = worker.concurrency
 
         def on_close(connection):
             """Callback called when connection closed."""
@@ -136,18 +139,23 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                 logger.error('Error handling new connection for'
                              ' service %r: %s', service, strerror(error))
                 return
-            if concurrency.reached:
-                logger.error('Can\'t handle new connection,'
-                             ' concurrency limit reached')
+            try:
+                fd, addr = helpers.accept_connection(listen_fd)
+            except OSError as exc:
+                if exc.errno not in NOTBLOCK:
+                    raise
                 return
-            with ignore_eagain():
-                sock, addr = listen_sock.accept()
-                # Disable Nagle's algorithm for socket.
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                handle = Handle(loop)
-                handle.open(sock.fileno())
-                connection = self.Connection(producer, loop, handle, sock, on_close)
-                connections.register(connection)
+            try:
+                # Setup socket.
+                helpers.set_nonblocking(fd)
+                helpers.set_sockopt(fd, socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            except:
+                os.close(fd)
+                raise
+            handle = Handle(loop)
+            handle.open(fd)
+            connection = self.Connection(producer, loop, handle, addr, on_close)
+            connections.register(connection)
 
         return inner_acceptor
 

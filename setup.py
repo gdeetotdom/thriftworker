@@ -118,6 +118,7 @@ def source_extension(name):
 
 modules = {
     'transports.framed.connection': dict(),
+    'transports.helpers': dict(),
     'utils.stats.counter': dict(
         include_dirs=[os.path.join(here, 'src')],
         sources=[source_extension('utils.stats.counter'),
@@ -215,7 +216,7 @@ setup(
     ext_modules=extensions,
     packages=find_packages(),
     install_requires=[
-        'pyuv>=0.8.3',
+        'pyuv>=0.10.0',
         'thrift>=0.8.0',
         'six>=1.2.0',
         'greenlet>=0.4.0',

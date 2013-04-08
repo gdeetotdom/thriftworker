@@ -14,12 +14,12 @@ class EchoConnection(object):
     OPENED = 0x1
     CLOSED = 0x2
 
-    def __init__(self, producer, loop, client, sock, on_close):
+    def __init__(self, producer, loop, client, peer, on_close):
         self.state = self.OPENED
         self.producer = producer
         self.loop = loop
         self.client = client
-        self.sock = sock
+        self.peer = peer
         self.on_close = on_close
         client.start_read(self.on_read)
 
@@ -37,7 +37,6 @@ class EchoConnection(object):
         assert self.state == self.OPENED
         self.state = self.CLOSED
         self.client.close()
-        self.sock.close()
         self.on_close(self)
 
 
