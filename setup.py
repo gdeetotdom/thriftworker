@@ -123,6 +123,7 @@ modules = {
         include_dirs=[os.path.join(here, 'src')],
         sources=[source_extension('workers.helpers'),
                  os.path.join(here, 'src', 'monotonic.c')],
+        extra_compile_args=['-lrt'],
     ),
     'utils.stats.counter': dict(
         include_dirs=[os.path.join(here, 'src')],
