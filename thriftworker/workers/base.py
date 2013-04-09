@@ -11,7 +11,10 @@ from thriftworker.utils.mixin import LoopMixin, StartStopMixin
 from thriftworker.utils.atomics import ContextCounter
 from thriftworker.utils.decorators import cached_property
 
-from .helpers import monotonic_time
+try:
+    from .helpers import monotonic_time
+except ImportError:
+    from time import time as monotonic_time
 
 logger = logging.getLogger(__name__)
 
