@@ -119,6 +119,11 @@ def source_extension(name):
 modules = {
     'transports.framed.connection': dict(),
     'transports.helpers': dict(),
+    'workers.helpers': dict(
+        include_dirs=[os.path.join(here, 'src')],
+        sources=[source_extension('workers.helpers'),
+                 os.path.join(here, 'src', 'monotonic.c')],
+    ),
     'utils.stats.counter': dict(
         include_dirs=[os.path.join(here, 'src')],
         sources=[source_extension('utils.stats.counter'),

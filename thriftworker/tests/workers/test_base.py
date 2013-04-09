@@ -45,8 +45,9 @@ class TestBaseWorker(WorkerMixin, TestCase):
             Mock(), object(), object(), (None, object())
         connection.is_waiting.return_value = True
         with start_stop_ctx(self.create_worker()) as worker:
-            request = self.Worker.Request(connection, data, request_id,
-                                          self.service_name, 0)
+            request = self.Worker.Request(
+                self.loop, connection, data, request_id, self.service_name)
+            request.execute(Mock(return_value=result))
             callback = worker.create_callback()
             callback(request, result)
             self.assertEqual(1, connection.ready.call_count)
