@@ -87,6 +87,7 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
     def create_callback(self):
         """Create callback that should be called after request was done."""
         concurrency = self.concurrency
+        pool_size = self.pool_size
         acceptors = self.app.acceptors
         counter = self.app.counters['response_served']
         timeouts = self.app.timeouts
@@ -98,8 +99,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
             if not concurrency.reached:
                 return
             concurrency.reached.clean()
-            logger.debug('Start registered acceptors,'
-                         ' current concurrency: %d...', int(concurrency))
+            logger.info('Start registered acceptors,'
+                        ' current concurrency: %d...', int(concurrency))
             acceptors.start_accepting()
 
         def inner_callback(request, result, exception=None):
@@ -121,7 +122,7 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
                 execution_timers[method_name] += request.execution_time
                 dispatching_timers[method_name] += request.dispatching_timers
 
-            if concurrency.reached:
+            if concurrency.reached and pool_size > concurrency:
                 delay(start_accepting)
 
         return inner_callback
@@ -163,8 +164,8 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         def stop_accepting():
             if concurrency.reached or pool_size > concurrency:
                 return
-            logger.debug('Stop registered acceptors,'
-                         ' current concurrency: %d...', int(concurrency))
+            logger.info('Stop registered acceptors,'
+                        ' current concurrency: %d...', int(concurrency))
             counter.add()
             concurrency.reached.set()
             acceptors.stop_accepting()
