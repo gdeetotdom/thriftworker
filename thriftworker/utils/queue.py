@@ -42,7 +42,8 @@ class AsyncQueue(object):
 
         """
         self._queue.append(msg)
-        self._tick.send()
+        if not self._tick.closed:
+            self._tick.send()
 
     def close(self):
         """ close the queue """

@@ -4,7 +4,6 @@ import os
 import socket
 import errno
 import logging
-from itertools import chain
 from contextlib import contextmanager
 from abc import ABCMeta, abstractproperty
 
@@ -16,7 +15,7 @@ from thriftworker.constants import BACKLOG_SIZE
 from thriftworker.utils.mixin import LoopMixin, StartStopMixin
 from thriftworker.utils.loop import in_loop
 from thriftworker.utils.decorators import cached_property
-from thriftworker.utils.waiting import wait
+from thriftworker.utils.waiter import Waiter
 
 from . import helpers
 
@@ -39,10 +38,11 @@ def ignore_eagain():
 
 
 class Connections(object):
-    """Store connections."""
+    """Store existed connections."""
 
     def __init__(self):
         self.connections = set()
+        self._callback = None
 
     def __len__(self):
         return len(self.connections)
@@ -52,6 +52,24 @@ class Connections(object):
 
     def __repr__(self):
         return repr(self.connections)
+
+    def _execute_callback(self):
+        """Execute callback if needed."""
+        if self._callback is not None:
+            self._callback()
+            self._callback = None
+
+    @property
+    def callback(self):
+        """Return callback if existed."""
+        return self._callback
+
+    @callback.setter
+    def callback(self, cb):
+        """Setup callback and execute it if needed."""
+        self._callback = cb
+        if not self.connections:
+            self._execute_callback()
 
     def register(self, connection):
         """Register new connection."""
@@ -63,6 +81,8 @@ class Connections(object):
             self.connections.remove(connection)
         except KeyError:
             pass
+        if not self.connections:
+            self._execute_callback()
 
     def close(self):
         connections = self.connections
@@ -71,6 +91,7 @@ class Connections(object):
             if not connection.is_closed():
                 logger.warn('Connection %r closed prematurely', connection)
                 connection.close()
+        self._execute_callback()
 
 
 class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
@@ -109,6 +130,11 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
     def connections_number(self):
         """Return number of active connections."""
         return len(self._connections)
+
+    @property
+    def empty(self):
+        """Is acceptor empty or not."""
+        return self.connections_number == 0
 
     @property
     def active(self):
@@ -167,11 +193,12 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
             poller.start(UV_READABLE, self.acceptor)
 
     @in_loop
-    def stop(self):
+    def stop(self, callback=None):
         """Stop acceptor if active."""
         poller = self._poller
         if poller.active and not poller.closed:
             poller.stop()
+        self._connections.callback = callback
 
     @in_loop
     def close(self):
@@ -187,6 +214,8 @@ class Acceptors(StartStopMixin, LoopMixin):
 
     def __init__(self):
         self._acceptors = {}
+        self._stop_waiter = Waiter(
+            timeout=self.app.shutdown_timeout)
         super(Acceptors, self).__init__()
 
     def __iter__(self):
@@ -217,24 +246,35 @@ class Acceptors(StartStopMixin, LoopMixin):
         for acceptor in self._acceptors.values():
             acceptor.start()
 
-    def stop_accepting(self):
+    def stop_accepting(self, callback=None):
         """Stop all registered acceptors if needed."""
         for acceptor in self._acceptors.values():
-            acceptor.stop()
+            acceptor.stop(callback)
 
     @property
     def connections_number(self):
+        """Return current connection number across all acceptors."""
         return sum(acceptor.connections_number for acceptor in self)
+
+    @property
+    def empty(self):
+        """Are all acceptors empty or not."""
+        return self.connections_number == 0
 
     def stop(self):
         """Close all registered acceptors."""
-        self.stop_accepting()
         # wait for unclosed connections
-        if self.connections_number:
-            for connection in chain.from_iterable(self):
-                logger.info('Wait for %r...', connection)
-            if wait(lambda: self.connections_number == 0,
-                    timeout=self.app.shutdown_timeout):
-                logger.debug('All connections closed...')
+        def on_close():
+            if self.empty:
+                self._stop_waiter.done()
+        # stop accepting new connection
+        self.stop_accepting(callback=on_close)
+        # wait for unclosed connections
+        if not self.empty:
+            logger.info('Waiting for unclosed connections...')
+        self._stop_waiter.wait()
+        if not self.empty:
+            logger.warning('Not all connection closed!')
+        # close existed connection
         for acceptor in self:
             acceptor.close()

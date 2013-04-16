@@ -33,11 +33,6 @@ class TestApp(TestCase):
         app = ThriftWorker(loop=custom_loop)
         self.assertIs(custom_loop, app.loop)
 
-    def test_default_loop(self):
-        default_loop = Loop.default_loop()
-        app = ThriftWorker()
-        self.assertIs(default_loop, app.loop)
-
     def test_custom_proto_factory(self):
         factory = TBinaryProtocol.TBinaryProtocolFactory()
         app = ThriftWorker(protocol_factory=factory)

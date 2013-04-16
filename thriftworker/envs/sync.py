@@ -18,6 +18,7 @@ class SyncEnv(BaseEnv):
     @property
     def Event(self):
         return Event
+    RealEvent = Event
 
     @property
     def RLock(self):
