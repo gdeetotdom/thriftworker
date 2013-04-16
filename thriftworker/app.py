@@ -35,8 +35,9 @@ class ThriftWorker(SubclassMixin):
     def __init__(self, loop=None, protocol_factory=None, port_range=None,
                  pool_size=None, shutdown_timeout=None):
         self.counters = Counters()
-        self.timeouts = Counters()
-        self.timers = Timers()
+        self.timeouts = Timers()
+        self.execution_timers = Timers()
+        self.dispatching_timers = Timers()
         # Set provided instance if we can.
         if loop is not None:
             self.loop = loop
@@ -96,7 +97,7 @@ class ThriftWorker(SubclassMixin):
     @cached_property
     def loop(self):
         """Create event loop. Should be running in separate thread."""
-        return Loop.default_loop()
+        return Loop()
 
     @cached_property
     def Hub(self):

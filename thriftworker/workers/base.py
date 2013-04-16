@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import sys
 import logging
 from abc import ABCMeta, abstractmethod
 from functools import partial
@@ -10,21 +11,69 @@ from thriftworker.utils.mixin import LoopMixin, StartStopMixin
 from thriftworker.utils.atomics import ContextCounter
 from thriftworker.utils.decorators import cached_property
 
+try:
+    from .helpers import monotonic_time
+except ImportError:
+    from time import time as monotonic_time
+
 logger = logging.getLogger(__name__)
 
 
 class Request(object):
+    """Describe a request."""
 
-    __slots__ = ('connection', 'message_buffer', 'request_id', 'service',
-                 'start_time')
+    __slots__ = (
+        'loop', 'connection', 'message_buffer',
+        'request_id', 'service', 'receipt_time',
+        'start_time', 'end_time', 'dispatch_time',
+        'method', 'response', 'exception', 'successful',
+    )
 
-    def __init__(self, connection, message_buffer, request_id, service,
-                 start_time):
+    def __init__(self, loop, connection, message_buffer, request_id, service):
+        self.loop = loop
         self.connection = connection
         self.message_buffer = message_buffer
         self.request_id = request_id
         self.service = service
-        self.start_time = start_time
+        self.receipt_time = self.loop.now()
+        self.start_time = self.end_time = self.dispatch_time = None
+        self.method = self.response = self.exception = None
+        self.successful = None
+
+    @property
+    def dispatching_timers(self):
+        return self.dispatch_time - self.receipt_time
+
+    @property
+    def execution_time(self):
+        return (self.end_time - self.start_time) * 1e3
+
+    def execute(self, processor):
+        """Process our request."""
+        self.start_time = monotonic_time()
+        try:
+            self.method, self.response = processor(self.message_buffer)
+        except:
+            successful = self.successful = False
+            exception = self.exception = sys.exc_info()
+            logger.error(exception[1], exc_info=exception)
+        else:
+            successful = self.successful = True
+        finally:
+            self.end_time = monotonic_time()
+        return successful
+
+    def dispatch(self):
+        """Notify connection that request was processed."""
+        self.dispatch_time = self.loop.now()
+        if not self.connection.is_ready():
+            return False
+        self.connection.ready(self.successful, self.response, self.request_id)
+        return True
+
+    @property
+    def method_name(self):
+        return "{0}::{1}".format(self.service, self.method or 'unknown')
 
 
 class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
@@ -38,45 +87,42 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
     def create_callback(self):
         """Create callback that should be called after request was done."""
         concurrency = self.concurrency
+        pool_size = self.pool_size
         acceptors = self.app.acceptors
         counter = self.app.counters['response_served']
         timeouts = self.app.timeouts
-        timers = self.app.timers
-        loop = self.app.loop
+        execution_timers = self.app.execution_timers
+        dispatching_timers = self.app.dispatching_timers
         delay = self.app.hub.callback
 
         def start_accepting():
             if not concurrency.reached:
                 return
             concurrency.reached.clean()
-            logger.debug('Start registered acceptors,'
-                         ' current concurrency: %d...', int(concurrency))
+            logger.info('Start registered acceptors,'
+                        ' current concurrency: %d...', int(concurrency))
             acceptors.start_accepting()
 
         def inner_callback(request, result, exception=None):
             """Process task result."""
-            connection = request.connection
-            request_id = request.request_id 
+            method_name = request.method_name
 
-            if exception is None:
-                success, (method, response) = True, result
-                key = "{0}::{1}".format(request.service, method)
-                took = loop.now() - request.start_time
-                timers[key] += took
-            else:
-                logger.error(exception[1], exc_info=exception)
-                success, response = False, ''
-
-            if connection.is_ready():
+            if request.dispatch():
+                # connection is ready for answer
                 counter.add()
-                connection.ready(success, response, request_id)
-            elif exception is None and response:
-                timeouts[key] += took
+            elif request.successful and request.response:
+                # connection is not ready, we are late
+                timeouts[method_name] += request.dispatching_timers
                 logger.warn(
-                    "Method %s::%s took %d ms, it's too late for %r",
-                        request.service, method, int(took), connection)
+                    "Method %s took %.2f ms (exec %.2f ms), it's too late for %r",
+                        method_name, request.dispatching_timers,
+                        request.execution_time, request.connection)
 
-            if concurrency.reached:
+            if request.successful:
+                execution_timers[method_name] += request.execution_time
+                dispatching_timers[method_name] += request.dispatching_timers
+
+            if concurrency.reached and pool_size > concurrency:
                 delay(start_accepting)
 
         return inner_callback
@@ -97,7 +143,7 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         def inner_task(request):
             """Process incoming request with given processor."""
             with concurrency:
-                return processor(request.message_buffer)
+                return request.execute(processor)
 
         return inner_task
 
@@ -118,19 +164,19 @@ class BaseWorker(StartStopMixin, with_metaclass(ABCMeta, LoopMixin)):
         def stop_accepting():
             if concurrency.reached or pool_size > concurrency:
                 return
-            logger.debug('Stop registered acceptors,'
-                         ' current concurrency: %d...', int(concurrency))
+            logger.info('Stop registered acceptors,'
+                        ' current concurrency: %d...', int(concurrency))
             counter.add()
             concurrency.reached.set()
             acceptors.stop_accepting()
 
         def inner_producer(connection, message_buffer, request_id):
             """Enqueue given request to thread pool."""
-            request = Request(connection=connection,
+            request = Request(loop=loop,
+                              connection=connection,
                               message_buffer=message_buffer,
                               request_id=request_id,
-                              service=service,
-                              start_time=loop.now())
+                              service=service)
             curried_task = partial(task, request)
             consume(curried_task, partial(callback, request))
             if not concurrency.reached and pool_size <= concurrency:
