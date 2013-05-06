@@ -162,7 +162,10 @@ cdef class Connection:
     def on_shutdown(self, handle, error):
         if error:
             self.handle_error(error)
-        self.handle.close(self.on_close)
+        if self.handle.closed:
+            self.on_close(handle)
+        else:
+            self.handle.close(self.on_close)
 
     def close(self):
         """Closes connection."""
