@@ -3,10 +3,12 @@ from __future__ import absolute_import
 import sys
 import logging
 from collections import namedtuple
-from threading import Thread
+from threading import Thread, Event
 
-from thriftworker.utils.decorators import cached_property
-from thriftworker.workers.base import BaseWorker
+from ..utils.decorators import cached_property
+
+from .base import BaseWorker
+from .queue import Queue
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +21,8 @@ class Worker(Thread):
         self.app = app
         self.daemon = True
         self.queue = queue
-        self._is_shutdown = self.app.env.Event()
-        self._is_stopped = self.app.env.Event()
+        self._is_shutdown = Event()
+        self._is_stopped = Event()
         self.shutdown_timeout = shutdown_timeout or 5.0
 
     def body(self):
@@ -66,7 +68,7 @@ class Pool(object):
     def __init__(self, app, size=None):
         self.app = app
         self.size = size or 1
-        self.queue = self.app.env.queue.Queue()
+        self.queue = Queue()
 
     @cached_property
     def _workers(self):
@@ -97,9 +99,10 @@ class ThreadsWorker(BaseWorker):
 
     def create_consumer(self):
         pool = self._pool
+        Message = self.Message
 
         def inner_consumer(task, callback):
-            pool.put(self.Message(task, callback))
+            pool.put(Message(task, callback))
 
         return inner_consumer
 

@@ -3,6 +3,8 @@ from __future__ import absolute_import
 
 import sys
 from functools import wraps, partial
+from thread import get_ident
+from threading import Event
 
 import six
 
@@ -32,7 +34,7 @@ def _create_decorator(decorator, *args, **options):
                 except AttributeError:
                     raise RuntimeError('Loop not started')
 
-                if ident == current_app.env.get_real_ident():
+                if ident == get_ident():
                     # Don't block main loop.
                     return func(*args, **kwargs)
                 else:
@@ -57,7 +59,7 @@ class Container(object):
         self.timeout = timeout
         self._result = None
         self._exception = None
-        self._event = current_app.env.RealEvent()
+        self._event = Event()
 
     @property
     def exception(self):

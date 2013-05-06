@@ -10,7 +10,6 @@ import logging
 from pyuv import Loop
 from thrift.protocol import TBinaryProtocol
 
-from . import constants
 from .transports.base import Acceptors
 from .state import set_current_app, get_current_app
 from .listener import Listener, Listeners
@@ -18,7 +17,6 @@ from .hub import Hub
 from .services import Services
 from .utils.decorators import cached_property
 from .utils.mixin import SubclassMixin
-from .utils.env import detect_environment
 from .utils.stats import Counters, Timers
 
 logger = logging.getLogger(__name__)
@@ -109,25 +107,6 @@ class ThriftWorker(SubclassMixin):
         """Instance of bounded :class:`LoopContainer`."""
         return self.Hub()
 
-    @property
-    def env_cls(self):
-        env = detect_environment()
-        if env == constants.GEVENT_ENV:
-            return 'thriftworker.envs.green:GeventEnv'
-        elif env == constants.DEFAULT_ENV:
-            return 'thriftworker.envs.sync:SyncEnv'
-        else:
-            raise NotImplementedError()
-
-    @cached_property
-    def Env(self):
-        return self.subclass_with_self(self.env_cls, reverse='Env')
-
-    @cached_property
-    def env(self):
-        logger.debug('Using {0!r} env'.format(self.Env))
-        return self.Env()
-
     @cached_property
     def Services(self):
         """Create bounded :class:`Processor` class."""
@@ -168,16 +147,10 @@ class ThriftWorker(SubclassMixin):
 
     @property
     def worker_cls(self):
-        env = detect_environment()
-        if env == constants.GEVENT_ENV:
-            return 'thriftworker.workers.green:GeventWorker'
-        elif env == constants.DEFAULT_ENV:
-            if self.pool_size == 1:
-                return 'thriftworker.workers.sync:SyncWorker'
-            else:
-                return 'thriftworker.workers.threads:ThreadsWorker'
+        if self.pool_size == 1:
+            return 'thriftworker.workers.sync:SyncWorker'
         else:
-            raise NotImplementedError()
+            return 'thriftworker.workers.threads:ThreadsWorker'
 
     @cached_property
     def Worker(self):
