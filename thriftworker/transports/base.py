@@ -7,7 +7,7 @@ import logging
 from contextlib import contextmanager
 from abc import ABCMeta, abstractproperty
 
-from pyuv import Pipe, TCP, Poll, UV_READABLE
+from pyuv import TCP, Poll, UV_READABLE
 from pyuv.errno import strerror
 from six import with_metaclass
 
@@ -17,11 +17,9 @@ from thriftworker.utils.loop import in_loop
 from thriftworker.utils.decorators import cached_property
 from thriftworker.utils.waiter import Waiter
 
-from . import helpers
+from . import utils
 
 logger = logging.getLogger(__name__)
-
-Handle = TCP if hasattr(TCP, 'open') else Pipe
 
 NOTBLOCK = (errno.EAGAIN, errno.EWOULDBLOCK, errno.EINVAL, errno.EBADF)
 
@@ -113,7 +111,6 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
     @cached_property
     def _socket(self):
         """Create socket from given descriptor."""
-        socket = self.app.env.socket
         sock = socket.fromfd(self.descriptor, socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(0)
         return sock
@@ -166,19 +163,19 @@ class BaseAcceptor(with_metaclass(ABCMeta, LoopMixin)):
                              ' service %r: %s', service, strerror(error))
                 return
             try:
-                fd, addr = helpers.accept_connection(listen_fd)
+                fd, addr = utils.accept_connection(listen_fd)
             except OSError as exc:
                 if exc.errno not in NOTBLOCK:
                     raise
                 return
             try:
                 # Setup socket.
-                helpers.set_nonblocking(fd)
-                helpers.set_sockopt(fd, socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                utils.set_nonblocking(fd)
+                utils.set_sockopt(fd, socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             except:
                 os.close(fd)
                 raise
-            handle = Handle(loop)
+            handle = TCP(loop)
             handle.open(fd)
             connection = self.Connection(producer, loop, handle, addr, on_close)
             connections.register(connection)

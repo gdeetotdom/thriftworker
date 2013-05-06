@@ -8,8 +8,8 @@ CI status: |cistatus|
 
 Key features:
 
-* Support multiple workers implementation (gevent, sync, threads pool);
-* Support multiple transports (currenlty only framed transport over tcp).
+* Support multiple workers implementation (sync, threads pool);
+* Support multiple transports (currently only framed transport over TCP).
 
 .. |cistatus| image:: https://secure.travis-ci.org/gdeetotdom/thriftworker.png?branch=master
 .. _`ThriftPool`: https://github.com/blackwithwhite666/thriftpool

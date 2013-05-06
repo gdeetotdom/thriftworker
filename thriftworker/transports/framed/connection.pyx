@@ -151,23 +151,27 @@ cdef class Connection:
         """Returns ``True`` if connection is closed."""
         return self.state == CONNECTION_CLOSED
 
-    cpdef object close(self):
+    def on_close(self, handle):
+        if self.close_callback is not None:
+            try:
+                self.close_callback(self)
+            finally:
+                # Remove references to callback.
+                self.close_callback = None
+
+    def on_shutdown(self, handle, error):
+        if error:
+            self.handle_error(error)
+        self.handle.close(self.on_close)
+
+    def close(self):
         """Closes connection."""
         assert not self.is_closed(), 'connection already closed'
-
-        # Close socket.
         self.state = CONNECTION_CLOSED
-        self.handle.close()
+        self.handle.shutdown(self.on_shutdown)
 
-        # Execute callback.
-        try:
-            self.close_callback(self)
-        finally:
-            # Remove references to callback.
-            self.close_callback = None
-
-    cpdef ready(self, object all_ok, object data, int packet_id):
-        assert self.state == CONNECTION_READY, 'connection not ready'
+    def ready(self, object all_ok, object data, int packet_id):
+        assert self.is_ready(), 'connection not ready'
 
         if self.current_packet_id != packet_id:
             return
@@ -185,7 +189,7 @@ cdef class Connection:
     cdef inline void handle_error(self, object error):
         logger.warn('Error with %r: %s', self, strerror(error))
 
-    cpdef cb_read_done(self, object handle, object data, object error):
+    def cb_read_done(self, object handle, object data, object error):
         if error:
             if error != UV_EOF:
                 self.handle_error(error)
@@ -211,7 +215,7 @@ cdef class Connection:
             logger.exception(exc)
             self.close()
 
-    cpdef cb_write_done(self, object handle, object error):
+    def cb_write_done(self, object handle, object error):
         if error:
             self.handle_error(error)
             self.close()
