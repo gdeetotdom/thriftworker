@@ -7,14 +7,10 @@ from functools import partial
 
 from six import with_metaclass
 
-from thriftworker.utils.mixin import LoopMixin, StartStopMixin
-from thriftworker.utils.atomics import ContextCounter
-from thriftworker.utils.decorators import cached_property
-
-try:
-    from .helpers import monotonic_time
-except ImportError:
-    from time import time as monotonic_time
+from ..utils.mixin import LoopMixin, StartStopMixin
+from ..utils.atomics import ContextCounter
+from ..utils.decorators import cached_property
+from ..utils.monotime import monotonic
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +46,7 @@ class Request(object):
 
     def execute(self, processor):
         """Process our request."""
-        self.start_time = monotonic_time()
+        self.start_time = monotonic()
         try:
             self.method, self.response = processor(self.message_buffer)
         except:
@@ -60,7 +56,7 @@ class Request(object):
         else:
             successful = self.successful = True
         finally:
-            self.end_time = monotonic_time()
+            self.end_time = monotonic()
         return successful
 
     def dispatch(self):

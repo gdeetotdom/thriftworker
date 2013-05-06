@@ -3,8 +3,7 @@ from __future__ import absolute_import
 
 import logging
 
-from thriftworker.utils.decorators import cached_property
-from thriftworker.state import current_app
+from threading import Event
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +18,8 @@ class Waiter(object):
     def __init__(self, timeout=None):
         self.timeout = timeout or 30
         self._aborted = False
+        self._event = Event()
         super(Waiter, self).__init__()
-
-    @cached_property
-    def _event(self):
-        return current_app.env.RealEvent()
 
     def reset(self):
         """Reset waiter state."""

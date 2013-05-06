@@ -118,12 +118,10 @@ def source_extension(name):
 
 modules = {
     'transports.framed.connection': dict(),
-    'transports.helpers': dict(),
-    'workers.helpers': dict(
-        include_dirs=[os.path.join(here, 'src')],
-        sources=[source_extension('workers.helpers'),
-                 os.path.join(here, 'src', 'monotonic.c')],
-        extra_link_args=['-lrt'],
+    'transports.utils': dict(),
+    'utils._monotime': dict(
+        sources=[os.path.join(here, 'src', 'monotime.c')],
+        extra_link_args=['-lrt'] if sys.platform != 'darwin' else [],
     ),
     'utils.stats.counter': dict(
         include_dirs=[os.path.join(here, 'src')],
