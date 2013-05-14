@@ -159,19 +159,12 @@ cdef class Connection:
                 # Remove references to callback.
                 self.close_callback = None
 
-    def on_shutdown(self, handle, error):
-        if error:
-            self.handle_error(error)
-        if self.handle.closed:
-            self.on_close(handle)
-        else:
-            self.handle.close(self.on_close)
-
     def close(self):
         """Closes connection."""
         assert not self.is_closed(), 'connection already closed'
         self.state = CONNECTION_CLOSED
-        self.handle.shutdown(self.on_shutdown)
+        if not self.handle.closed:
+            self.handle.close(self.on_close)
 
     def ready(self, object all_ok, object data, int packet_id):
         assert self.is_ready(), 'connection not ready'
