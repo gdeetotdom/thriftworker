@@ -116,25 +116,39 @@ def source_extension(name):
     return os.path.join('thriftworker', *parts)
 
 
+def prepare_sources(sources):
+    def to_string(s):
+        if isinstance(s, unicode):
+            return s.encode('utf-8')
+        return s
+    return [to_string(source) for source in sources]
+
+
 modules = {
     'transports.framed.connection': dict(),
     'transports.utils': dict(),
     'utils._monotime': dict(
-        sources=[os.path.join(here, 'src', 'monotime.c')],
+        sources=[
+            os.path.join(here, 'src', 'monotime.c'),
+        ],
         extra_link_args=['-lrt'] if sys.platform != 'darwin' else [],
     ),
     'utils.stats.counter': dict(
         include_dirs=[os.path.join(here, 'src')],
-        sources=[source_extension('utils.stats.counter'),
-                 os.path.join(here, 'src', 'cm_counter.c')],
+        sources=[
+            source_extension('utils.stats.counter'),
+            os.path.join(here, 'src', 'cm_counter.c'),
+        ],
         extra_compile_args=['-std=c99'],
     ),
     'utils.stats.timer': dict(
         include_dirs=[os.path.join(here, 'src')],
-        sources=[source_extension('utils.stats.timer'),
-                 os.path.join(here, 'src', 'cm_timer.c'),
-                 os.path.join(here, 'src', 'cm_quantile.c'),
-                 os.path.join(here, 'src', 'cm_heap.c')],
+        sources=[
+            source_extension('utils.stats.timer'),
+            os.path.join(here, 'src', 'cm_timer.c'),
+            os.path.join(here, 'src', 'cm_quantile.c'),
+            os.path.join(here, 'src', 'cm_heap.c'),
+        ],
         extra_compile_args=['-std=c99'],
     ),
     'utils.atomics.integer': dict(
@@ -149,6 +163,7 @@ modules = {
 for module, kwargs in modules.items():
     kwargs = dict(extension_kwargs, **kwargs)
     kwargs.setdefault('sources', [source_extension(module)])
+    kwargs['sources'] = prepare_sources(kwargs['sources'])
     ext = Extension('thriftworker.{0}'.format(module), **kwargs)
     if suffix == '.pyx' and ext.sources[0].endswith('.c'):
         # undo setuptools stupidly clobbering cython sources:
